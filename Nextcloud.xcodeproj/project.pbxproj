@@ -1243,7 +1243,7 @@
 		F7CA1ECE20E7E3FE002CC65E /* NSLayoutConstraint+PKDownloadButton.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSLayoutConstraint+PKDownloadButton.m"; sourceTree = "<group>"; };
 		F7CA1ECF20E7E3FE002CC65E /* PKPendingView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PKPendingView.h; sourceTree = "<group>"; };
 		F7CC04E61F5AD50D00378CEF /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F7CE8AFA1DC1F8D8009CAE48 /* Nextcloud.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nextcloud.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7CE8AFA1DC1F8D8009CAE48 /* Nextcloud-JR.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Nextcloud-JR.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7CE8AFB1DC1F8D8009CAE48 /* Share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = Share.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7D0E65E1BC5042E008D989A /* CCDetail.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; lineEnding = 0; path = CCDetail.h; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.objcpp; };
 		F7D0E65F1BC5042E008D989A /* CCDetail.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; lineEnding = 0; path = CCDetail.m; sourceTree = "<group>"; xcLanguageSpecificationIdentifier = xcode.lang.objc; };
@@ -2910,7 +2910,7 @@
 		F7FC7D651DC1F98700BB2C6A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				F7CE8AFA1DC1F8D8009CAE48 /* Nextcloud.app */,
+				F7CE8AFA1DC1F8D8009CAE48 /* Nextcloud-JR.app */,
 				F7CE8AFB1DC1F8D8009CAE48 /* Share.appex */,
 			);
 			name = Products;
@@ -2979,9 +2979,9 @@
 			productReference = F771E3D020E2392D00AFB62D /* File Provider Extension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
-		F77B0DEB1D118A16002130FE /* Nextcloud */ = {
+		F77B0DEB1D118A16002130FE /* Nextcloud-JR */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = F77B0F9A1D118A16002130FE /* Build configuration list for PBXNativeTarget "Nextcloud" */;
+			buildConfigurationList = F77B0F9A1D118A16002130FE /* Build configuration list for PBXNativeTarget "Nextcloud-JR" */;
 			buildPhases = (
 				F77B0DEF1D118A16002130FE /* Sources */,
 				F77B0EDC1D118A16002130FE /* Frameworks */,
@@ -2997,9 +2997,9 @@
 				F7145A321D12E65F00CAFEEC /* PBXTargetDependency */,
 				F771E3EA20E2392E00AFB62D /* PBXTargetDependency */,
 			);
-			name = Nextcloud;
+			name = "Nextcloud-JR";
 			productName = "Crypto Cloud";
-			productReference = F7CE8AFA1DC1F8D8009CAE48 /* Nextcloud.app */;
+			productReference = F7CE8AFA1DC1F8D8009CAE48 /* Nextcloud-JR.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -3100,7 +3100,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F77B0DEB1D118A16002130FE /* Nextcloud */,
+				F77B0DEB1D118A16002130FE /* Nextcloud-JR */,
 				F71459B41D12E3B700CAFEEC /* Share */,
 				F771E3CF20E2392D00AFB62D /* File Provider Extension */,
 			);
@@ -4263,7 +4263,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		F77B0F9A1D118A16002130FE /* Build configuration list for PBXNativeTarget "Nextcloud" */ = {
+		F77B0F9A1D118A16002130FE /* Build configuration list for PBXNativeTarget "Nextcloud-JR" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				F77B0F9B1D118A16002130FE /* Debug */,
