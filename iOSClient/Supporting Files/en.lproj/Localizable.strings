@@ -1,6 +1,6 @@
 //
 //  Localizable.strings
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Copyright © 2017 Marino Faggiana. All rights reserved.
 //
@@ -75,7 +75,8 @@
 "_postpone_"                = "Postpone";
 "_remove_"                  = "Remove";
 "_file_not_found_"          = "File not found";
-"_continue_"                = "Do you want to continue?";
+"_continue_"                = "Continue";
+"_continue_request_"        = "Do you want to continue?";
 "_auto_upload_folder_"      = "Auto upload";
 "_gallery_"                 = "Gallery";
 "_photo_"                   = "Photo";
@@ -98,6 +99,23 @@
 "_no_albums_"               = "No albums";
 "_denied_album_"            = "This app does not have access to \"Photos\", you can enable access in Privacy Settings";
 "_denied_camera_"           = "This app does not have access to \"Camera\", you can enable access in Privacy Settings";
+"_start_"                   = "Start";
+"_purchase_"                = "Purchase";
+"_account_not_available_"   = "The account %@ of %@ do not exists, please add it to be able to read the file %@";
+"_error_parameter_schema_"  = "Wrong parameters, impossible to continue";
+"_comments_"                = "Comments";
+"_sharing_"                 = "Sharing";
+"_details_"                 = "Details";
+"_dark_mode_"               = "Dark mode";
+"_dark_mode_detect_"        = "Detect iOS dark mode";
+"_screen_"                  = "Screen";
+"_wipe_account_"            = "Account wiped from server";
+"_appconfig_view_title_"    = "Account configuration in progress…";
+"_no_permission_add_file_"  = "You don't have permission to add files";
+"_no_permission_delete_file_" = "You don't have permission to delete files";
+"_no_permission_modify_file_" = "You don't have permission to modify files";
+"_request_upload_new_ver_"  = "The file has been modified, do you want to upload the new version ?";
+"_add_folder_info_"         = "Add folder info";
 
 // App
 
@@ -151,8 +169,7 @@
 "_want_exit_"                   = "Attention! Will be reset to initial state. Continue?";
 "_proceed_"                     = "Proceed";
 "_delete_cache_"                = "Delete cache";
-"_want_delete_cache_"           = "Do you want to delete the cache?";
-"_delete_cache_and_db_"         = "Yes and remove the transfers in progress";
+"_want_delete_cache_"           = "Do you want to delete the cache (this also removes the transfers in progress) ?";
 "_want_delete_thumbnails_"      = "Do you want to delete all thumbnails too?";
 "_mail_deleted_"                = "Email deleted";
 "_mail_saved_"                  = "Email saved";
@@ -164,7 +181,7 @@
 "_manage_account_"              = "Manage account";
 "_change_password_"             = "Change password";
 "_add_account_"                 = "Add account";
-"_delete_account_"              = "Delete account";
+"_delete_account_"              = "Remove account";
 "_want_delete_"                 = "Do you really want to delete?";
 "_no_delete_"                   = "No, do not delete";
 "_yes_delete_"                  = "Yes, delete";
@@ -177,7 +194,7 @@
 "_change_simply_passcode_"      = "Change password type";
 "_quota_"                       = "Quota";
 "_available_"                   = "available";
-"_cloud_account_"               = "Cloud Account";
+"_accounts_"                    = "Accounts";
 "_information_"                 = "Information";
 "_personal_information_"        = "Personal info";
 "_user_full_name_"              = "Full name";
@@ -186,13 +203,27 @@
 "_user_email_"                  = "Email";
 "_user_web_"                    = "Website";
 "_user_twitter_"                = "Twitter";
+"_user_job_"                    = "Job";
+"_user_businesssize_"           = "Business size";
+"_user_businesstype_"           = "Business type";
+"_user_city_"                   = "City";
+"_user_country_"                = "Country";
+"_user_company_"                = "Company";
+"_user_role_"                   = "Role";
+"_user_zip_"                    = "Zip";
+"_user_owner_"                  = "Owner";
+"_user_employee_"               = "Employee";
+"_user_contractor_"             = "Contractor";
+"_user_editprofile_"            = "Edit profile";
 "_favorite_offline_"            = "Favorites available offline";
 "_favorite_offline_footer_"     = "Making all favorites available offline may take a while and use a lot of memory while doing it.";
 "_advanced_"                    = "Advanced";
-"Skip"                          = "Skip";
-"Start"                         = "Start";
 "_disable_files_app_"           = "Disable Files App integration";
 "_disable_files_app_footer_"    = "Do not permit the access of files across the Apple Files application";
+"_trial_"                       = "Trial";
+"_trial_expired_day_"           = "Days remaining";
+"_disableLocalCacheAfterUpload_footer_" = "After uploading the file, do not keep it in the local cache";
+"_disableLocalCacheAfterUpload_"        = "Disable local cache";
 
 // Manage AutoUpload
 
@@ -234,6 +265,10 @@
 "_show_hidden_files_"           = "Show hidden files";
 "_format_compatibility_"        = "Most Compatible";
 "_format_compatibility_footer_" = "\"Most compatible\" will save, when possible, photos as JPEG";
+"_privacy_"                     = "Privacy";
+"_privacy_footer_"              = "Nextcloud iOS uses a service for the analysis of a crash. Your personal information is not sent with the report. If you want disable it, please change the setting \"Disable crash reporter\" to ON";
+"_crashservice_title_"          = "Disable crash reporter";
+"_crashservice_alert_"          = "This option requires a restart of the app to take effect";
 
 // Login
 
@@ -268,6 +303,7 @@
 "_tutorial_autoupload_view_"                = "You can enable auto uploads from \"Settings\"";
 "_no_date_"                                 = "No date";
 "_today_"                                   = "Today";
+"_yesterday_"                               = "Yesterday";
 "_time_"                                    = "Time: %@\n\n%@";
 "_location_not_enabled_"                    = "Location Services not enabled";
 "_location_not_enabled_msg_"                = "Please go to \"Settings\" and turn on \"Location Services\"";
@@ -386,6 +422,7 @@
 "_copy_files_"                  = "Copy files";
 "_paste_file_"                  = "Paste file";
 "_paste_files_"                 = "Paste files";
+"_open_internal_view_"          = "Open with internal viewer";
 
 "_search_this_folder_"          = "Search in this folder";
 "_search_all_folders_"          = "Search in all folders";
@@ -438,6 +475,28 @@
 "_share_type_user_"             = "User";
 "_share_type_group_"            = "Group";
 "_share_type_remote_"           = "Remote";
+"_enforce_password_protection_" = "Enforce password protection";
+"_password_obligatory_"         = "Enforce password protection enabled, password obligatory";
+"_shared_with_you_by_"          = "Shared with you by";
+"_shareLinksearch_placeholder_" = "Type a name and press Enter";
+"_new_comment_"                 = "New comment…";
+"_edit_comment_"                = "Edit comment";
+"_delete_comment_"              = "Delete comment";
+"_share_allow_editing_"         = "Allow editing";
+"_share_read_only_"             = "Read only";
+"_share_allow_upload_"          = "Allow upload and editing";
+"_share_file_drop_"             = "File drop (upload only)";
+"_share_hide_download_"         = "Hide download";
+"_share_password_protect_"      = "Password protect";
+"_share_expiration_date_"       = "Set expiration date";
+"_share_note_recipient_"        = "Note to recipient";
+"_share_delete_sharelink_"      = "Delete share link";
+"_share_add_sharelink_"         = "Add another link";
+"_share_can_reshare_"           = "Can reshare";
+"_share_can_create_"            = "Can create";
+"_share_can_change_"            = "Can change";
+"_share_can_delete_"            = "Can delete";
+"_share_unshare_"               = "Unshare";
 
 // Share Permission
 
@@ -484,12 +543,14 @@
 "_transfers_"                       = "Transfers";
 "_activity_"                        = "Activity";
 "_activity_file_not_present_"       = "File no longer present";
+"_trash_file_not_found_"            = "It seems that the file is not in the trash, go to the trash to update it and try again";
 
 // List Shares
 
 "_list_shares_"                     = "Shares";
 "_list_shares_no_files_"            = "No shares yet";
 "_tutorial_list_shares_view_"       = "Files and folders you share will show up here";
+
 
 // Offline - Local Storage
 
@@ -503,6 +564,7 @@
 "_upload_photos_videos_"            = "Upload photos or videos";
 "_upload_file_"                     = "Upload file";
 "_upload_file_text_"                = "Create text file";
+"_create_nextcloudtext_document_"   = "Create text document";
 
 // Document Picker
 
@@ -519,6 +581,7 @@
 "_add_filenametype_"                = "Specify type in filename";
 "_filenametype_photo_video_"        = "Photo/Video";
 "_maintain_original_filename_"      = "Maintain original filename";
+"_modify_photo_"                    = "Modify photo";
 
 // Notification
 
@@ -540,6 +603,7 @@
 // Text File
 
 "_untitled_txt_"                    = "Untitled.txt";
+"_text_upload_title_"               = "Upload text file";
 
 // EndToEnd Encryption
 
@@ -565,8 +629,7 @@
 "_e2e_error_create_encrypted_"      = "Could not create encrypted file";
 "_e2e_error_update_metadata_"       = "Update metadata error";
 "_e2e_error_store_metadata_"        = "Could not save metadata";
-"_e2e_error_send_metadata_"         = "Could not send metadata";
-"_e2e_error_delete_metadata_"       = "Could not delete metadata";
+"_e2e_error_send_metadata_"         = "Could not send metadata";"_e2e_error_delete_metadata_"       = "Could not delete metadata";
 "_e2e_error_get_metadata_"          = "Could not fetch metadata";
 "_e2e_error_not_enabled_"           = "Serious internal error. End-to-end encryption not enabled";
 "_e2e_error_record_not_found_"      = "Serious internal error. Records not found";
@@ -578,7 +641,7 @@
 
 // Scan Document
 
-"_scans_document_"                  = "Scans document";
+"_scans_document_"                  = "Scan document";
 "_scanned_images_"                  = "Scanned images";
 "_scan_document_pdf_page_"          = "Page";
 "_scan_label_document_zone_"        = "Drag images down for document creation";
@@ -593,6 +656,7 @@
 "_pdf_password_"                    = "PDF Password";
 "_file_creation_"                   = "File creation";
 "_delete_all_scanned_images_"       = "Do you want to delete all scanned images?";
+"_text_recognition_"                = "Text recognition";
 
 /* The title on the navigation bar of the Scanning screen. */
 "wescan.scanning.title"             = "Scanning";
@@ -617,7 +681,7 @@
 
 // Offline
 
-"_manage_file_offline_"             = "Manage file offline";
+"_manage_file_offline_"             = "Manage offline files";
 "_set_available_offline_"           = "Set as available offline";
 "_remove_available_offline_"        = "Remove as available offline";
 
@@ -626,6 +690,7 @@
 "_create_new_document_"             = "Create new document";
 "_create_new_spreadsheet_"          = "Create new spreadsheet";
 "_create_new_presentation_"         = "Create new presentation";
+"_go_online_"                       = "Go online to see the document";
 
 // Intro
 
@@ -653,7 +718,7 @@
 "_server_down_"                         = "Could not establish contact with server";
 "_time_out_"                            = "Timeout, try again";
 "_unknow_response_server_"              = "Unexpected response from server";
-"_user_autentication_required_"         = "User autentication required";
+"_user_authentication_required_"        = "User authentication required";
 "_file_directory_locked_"               = "File or directory locked";
 "_ssl_certificate_untrusted_"           = "The certificate for this server is invalid";
 "_internal_server_"                     = "Internal server error";
@@ -672,6 +737,9 @@
 "_webdav_locked_"                       = "WebDAV Locked: Trying to access locked resource";
 "_error_user_not_available_"            = "The user is no longer available";
 "_server_response_error_"               = "Server response content error";
+"_no_nextcloud_found_"                  = "Nextcloud server not found";
+"_error_decompressing_"                 = "Error during decompressing. Unknown compression method or the file is corrupt";
+"_error_json_decoding_"                 = "Serious internal error in decoding metadata (The data couldn’t be read because it isn’t in the correct format.)";
 
 // BKPasscode
 
@@ -714,4 +782,19 @@
 "Try again in %d minutes" = "Try again in %d minutes";
 
 "Try again in 1 minute" = "Try again in 1 minute";
+
+// QRCode
+
+"_qrcode_not_authorized_"   = "This app is not authorized to use Back Camera";
+"_qrcode_not_supported_"    = "QRCode not supported by the current device";
+
+// Voice Memo
+
+"_create_voice_memo_"       = "Create voice memo";
+"_voice_memo_start_"        = "tap to start";
+"_voice_memo_stop_"         = "tap to stop";
+"_voice_memo_filename_"     = "voice memo";
+"_voice_memo_title_"        = "Upload voice memo";
+
+
 

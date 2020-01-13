@@ -23,8 +23,11 @@
 
 
 import Foundation
-import PDFGenerator
 import WeScan
+
+#if GOOGLEMOBILEVISION
+import GoogleMobileVision
+#endif
 
 class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
     
@@ -39,8 +42,12 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
     var titleServerUrl = ""
     var arrayImages = [UIImage]()
     var fileName = CCUtility.createFileNameDate("scan", extension: "pdf")
-    var password : PDFPassword = ""
+    var password: String = ""
     var fileType = "PDF"
+    
+    #if GOOGLEMOBILEVISION
+    var textDetector: GMVDetector?
+    #endif
     
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
     
@@ -56,11 +63,43 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         
         self.serverUrl = serverUrl
         self.arrayImages = arrayImages
+    }
+    
+    // MARK: - View Life Cycle
+    
+    override func viewDidLoad() {
         
+        super.viewDidLoad()
+        
+        let saveButton : UIBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
+        self.navigationItem.rightBarButtonItem = saveButton
+        
+        self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
+
+        //        self.tableView.sectionHeaderHeight = 10
+        //        self.tableView.sectionFooterHeight = 10
+        //        self.tableView.backgroundColor = NCBrandColor.sharedInstance.backgroundView
+        
+        
+        //        let row : XLFormRowDescriptor  = self.form.formRow(withTag: "fileName")!
+        //        let rowCell = row.cell(forForm: self)
+        //        rowCell.becomeFirstResponder()
+        
+        #if GOOGLEMOBILEVISION
+        textDetector = GMVDetector(ofType: GMVDetectorTypeText, options: nil)
+        #endif
+        
+        // Theming view
+        NotificationCenter.default.addObserver(self, selector: #selector(self.changeTheming), name: NSNotification.Name(rawValue: "changeTheming"), object: nil)
+        changeTheming()
+    }
+    
+    @objc func changeTheming() {
+        appDelegate.changeTheming(self, tableView: tableView, collectionView: nil, form: true)
         initializeForm()
     }
     
-    //MARK: XLFormDescriptorDelegate
+    //MARK: XLForm
     
     func initializeForm() {
         
@@ -77,13 +116,14 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         
         row = XLFormRowDescriptor(tag: "ButtonDestinationFolder", rowType: XLFormRowDescriptorTypeButton, title: self.titleServerUrl)
         row.action.formSelector = #selector(changeDestinationFolder(_:))
-        
-        let imageFolder = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, multiplier:1, color: NCBrandColor.sharedInstance.brandElement) as UIImage
-        row.cellConfig["imageView.image"] = imageFolder
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
+        row.cellConfig["imageView.image"] = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, width: 50, height: 50, color: NCBrandColor.sharedInstance.brandElement) as UIImage
         
         row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+
         section.addFormRow(row)
         
         // Section: Quality
@@ -94,7 +134,8 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         row = XLFormRowDescriptor(tag: "compressionQuality", rowType: XLFormRowDescriptorTypeSlider)
         row.value = 0.5
         row.title = NSLocalizedString("_quality_medium_", comment: "")
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["slider.minimumTrackTintColor"] = NCBrandColor.sharedInstance.brand
         
         row.cellConfig["slider.maximumValue"] = 1
@@ -103,6 +144,7 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         
         row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.center.rawValue
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
         
@@ -112,38 +154,68 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         form.addFormSection(section)
         
         row = XLFormRowDescriptor(tag: "password", rowType: XLFormRowDescriptorTypePassword, title: NSLocalizedString("_password_", comment: ""))
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         row.cellConfig["textField.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textField.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textField.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
+        
+        // Section: Text recognition
+        
+        
+        #if GOOGLEMOBILEVISION
+        section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_text_recognition_", comment: ""))
+        form.addFormSection(section)
+            
+        row = XLFormRowDescriptor(tag: "textRecognition", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_text_recognition_", comment: ""))
+        row.value = 0
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
+        row.cellConfig["imageView.image"] = CCGraphics.changeThemingColorImage(UIImage(named: "textRecognition")!, width: 50, height: 50, color: NCBrandColor.sharedInstance.brandElement) as UIImage
+        
+        row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+
+        section.addFormRow(row)
+        #endif
         
         // Section: File
         
         section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_file_creation_", comment: ""))
         form.addFormSection(section)
         
+        row = XLFormRowDescriptor(tag: "filetype", rowType: XLFormRowDescriptorTypeSelectorSegmentedControl, title: NSLocalizedString("_file_type_", comment: ""))
         if arrayImages.count == 1 {
-            row = XLFormRowDescriptor(tag: "filetype", rowType: XLFormRowDescriptorTypeSelectorSegmentedControl, title: NSLocalizedString("_file_type_", comment: ""))
             row.selectorOptions = ["PDF","JPG"]
-            row.value = "PDF"
-            
-            row.cellConfig["tintColor"] = NCBrandColor.sharedInstance.brand
-            row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-            
-            section.addFormRow(row)
+        } else {
+            row.selectorOptions = ["PDF"]
         }
+        row.value = "PDF"
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
+        row.cellConfig["tintColor"] = NCBrandColor.sharedInstance.brand
+        row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+        
+        section.addFormRow(row)
+        
         
         row = XLFormRowDescriptor(tag: "fileName", rowType: XLFormRowDescriptorTypeAccount, title: NSLocalizedString("_filename_", comment: ""))
         row.value = self.fileName
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+
         row.cellConfig["textField.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textField.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textField.textColor"] = NCBrandColor.sharedInstance.textView
+
         section.addFormRow(row)
         
         self.form = form
@@ -152,6 +224,40 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
     override func formRowDescriptorValueHasChanged(_ formRow: XLFormRowDescriptor!, oldValue: Any!, newValue: Any!) {
         
         super.formRowDescriptorValueHasChanged(formRow, oldValue: oldValue, newValue: newValue)
+        
+        if formRow.tag == "textRecognition" {
+            
+            let rowCompressionQuality: XLFormRowDescriptor = self.form.formRow(withTag: "compressionQuality")!
+            let rowFileTape: XLFormRowDescriptor = self.form.formRow(withTag: "filetype")!
+            let rowFileName: XLFormRowDescriptor = self.form.formRow(withTag: "fileName")!
+            let rowPassword: XLFormRowDescriptor = self.form.formRow(withTag: "password")!
+           
+            self.form.delegate = nil
+            
+            if newValue as! Int == 1 {
+                rowFileTape.selectorOptions = ["PDF","TXT"]
+                rowFileTape.value = "PDF"
+                fileType = "PDF"
+                rowPassword.disabled = true
+                rowCompressionQuality.disabled = true
+            } else {
+                if arrayImages.count == 1 {
+                    rowFileTape.selectorOptions = ["PDF","JPG"]
+                } else {
+                    rowFileTape.selectorOptions = ["PDF"]
+                }
+                rowFileTape.value = "PDF"
+                fileType = "PDF"
+                rowPassword.disabled = false
+                rowCompressionQuality.disabled = false
+            }
+            
+            rowFileName.value = createFileName(rowFileName.value as? String)
+            self.updateFormRow(rowFileName)
+            self.tableView.reloadData()
+
+            self.form.delegate = self
+        }
         
         if formRow.tag == "fileName" {
             
@@ -199,9 +305,9 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         if formRow.tag == "password" {
             let stringPassword = newValue as? String
             if stringPassword != nil {
-                password = PDFPassword(stringPassword!)
+                password = stringPassword!
             } else {
-                password = PDFPassword("")
+                password = ""
             }
         }
         
@@ -210,64 +316,54 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
             
             let rowFileName : XLFormRowDescriptor  = self.form.formRow(withTag: "fileName")!
             let rowPassword : XLFormRowDescriptor  = self.form.formRow(withTag: "password")!
-            
-            // rowFileName
-            guard var name = rowFileName.value else {
-                return
-            }
-            if name as! String == "" {
-                name = CCUtility.createFileNameDate("scan", extension: "pdf")
-            }
-            
-            let ext = (name as! NSString).pathExtension.uppercased()
-            var newFileName = ""
-            
-            if (ext == "") {
-                newFileName = name as! String + "." + fileType.lowercased()
-            } else {
-                newFileName = (name as! NSString).deletingPathExtension + "." + fileType.lowercased()
-            }
-            
-            rowFileName.value = newFileName
+
+            rowFileName.value = createFileName(rowFileName.value as? String)
             
             self.updateFormRow(rowFileName)
             
             // rowPassword
-            if fileType == "JPG" {
+            if fileType == "JPG" || fileType == "TXT" {
                 rowPassword.value = ""
-                password = PDFPassword("")
+                password = ""
                 rowPassword.disabled = true
             } else {
                 rowPassword.disabled = false
             }
-            
+        
             self.updateFormRow(rowPassword)
         }
     }
     
-    // MARK: - View Life Cycle
+    override func textFieldDidBeginEditing(_ textField: UITextField) {
+        
+        let cell = textField.formDescriptorCell()
+        let tag = cell?.rowDescriptor.tag
+        
+        if tag == "fileName" {
+            CCUtility.selectFileName(from: textField)
+        }
+    }
     
-    override func viewDidLoad() {
+    func createFileName(_ fileName: String?) -> String {
         
-        super.viewDidLoad()
+        var name: String = ""
+        var newFileName: String = ""
         
-        let saveButton : UIBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
-        self.navigationItem.rightBarButtonItem = saveButton
+        if fileName == nil || fileName == "" {
+            name = CCUtility.createFileNameDate("scan", extension: "pdf") ?? "scan.pdf"
+        } else {
+            name = fileName!
+        }
         
-        self.navigationController?.navigationBar.isTranslucent = false
-        self.navigationController?.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand
-        self.navigationController?.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText
-        self.navigationController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: NCBrandColor.sharedInstance.brandText]
+        let ext = (name as NSString).pathExtension.uppercased()
         
-        self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
-        //        self.tableView.sectionHeaderHeight = 10
-        //        self.tableView.sectionFooterHeight = 10
-        //        self.tableView.backgroundColor = NCBrandColor.sharedInstance.backgroundView
+        if (ext == "") {
+            newFileName = name + "." + fileType.lowercased()
+        } else {
+            newFileName = (name as NSString).deletingPathExtension + "." + fileType.lowercased()
+        }
         
-        
-        //        let row : XLFormRowDescriptor  = self.form.formRow(withTag: "fileName")!
-        //        let rowCell = row.cell(forForm: self)
-        //        rowCell.becomeFirstResponder()
+        return newFileName
     }
     
     // MARK: - Action
@@ -310,11 +406,7 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
             fileNameSave = (name as! NSString).deletingPathExtension + "." + fileType.lowercased()
         }
         
-        guard let directoryID = NCManageDatabase.sharedInstance.getDirectoryID(self.serverUrl) else {
-            return
-        }
-        let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "directoryID == %@ AND fileNameView == %@", directoryID, fileNameSave))
-        
+        let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@ AND fileNameView == %@", appDelegate.activeAccount, self.serverUrl, fileNameSave))
         if (metadata != nil) {
             
             let alertController = UIAlertController(title: fileNameSave, message: NSLocalizedString("_file_already_exists_", comment: ""), preferredStyle: .alert)
@@ -323,8 +415,8 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
             }
             
             let overwriteAction = UIAlertAction(title: NSLocalizedString("_overwrite_", comment: ""), style: .cancel) { (action:UIAlertAction) in
-                NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "directoryID == %@ AND fileNameView == %@", directoryID, fileNameSave), clearDateReadDirectoryID: directoryID)
-                self.dismissAndUpload(fileNameSave, fileID: directoryID + fileNameSave, directoryID: directoryID)
+                NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@ AND fileNameView == %@", self.appDelegate.activeAccount, self.serverUrl, fileNameSave))
+                self.dismissAndUpload(fileNameSave, ocId: CCUtility.createMetadataID(fromAccount: self.appDelegate.activeAccount, serverUrl: self.serverUrl, fileNameView: fileNameSave, directory: false)!, serverUrl: self.serverUrl)
             }
             
             alertController.addAction(cancelAction)
@@ -333,40 +425,110 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
             self.present(alertController, animated: true, completion:nil)
             
         } else {
-            let directoryID = NCManageDatabase.sharedInstance.getDirectoryID(self.serverUrl)!
-            dismissAndUpload(fileNameSave, fileID: directoryID + fileNameSave, directoryID: directoryID)
+            dismissAndUpload(fileNameSave, ocId: CCUtility.createMetadataID(fromAccount: appDelegate.activeAccount, serverUrl: serverUrl, fileNameView: fileNameSave, directory: false)!, serverUrl: serverUrl)
         }
     }
     
-    func dismissAndUpload(_ fileNameSave: String, fileID: String, directoryID: String) {
+    func dismissAndUpload(_ fileNameSave: String, ocId: String, serverUrl: String) {
         
-        guard let fileNameGenerateExport = CCUtility.getDirectoryProviderStorageFileID(fileID, fileNameView: fileNameSave) else {
-            self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+        guard let fileNameGenerateExport = CCUtility.getDirectoryProviderStorageOcId(ocId, fileNameView: fileNameSave) else {
+            NCContentPresenter.shared.messageNotification("_error_", description: "_error_creation_file_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.info, errorCode: 0)
             return
         }
         
-        if fileType == "PDF" {
+        #if GOOGLEMOBILEVISION
+        // Text Recognition TXT
+        if fileType == "TXT" && self.form.formRow(withTag: "textRecognition")!.value as! Int == 1 {
             
-            var pdfPages = [PDFPage]()
+            var textFile = ""
             
-            //Generate PDF
-            for var image in self.arrayImages {
+            for image in self.arrayImages {
                 
-                image = changeImageFromQuality(image, dpiQuality: dpiQuality)
+                guard let features = self.textDetector?.features(in: image, options: nil) as? [GMVTextBlockFeature] else {
+                    continue
+                }
                 
-                guard let data = image.jpegData(compressionQuality: 0.5) else {
-                    self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+                for textBlock in features {
+                    
+                    guard let text = textBlock.value else {
+                        continue
+                    }
+                    
+                    textFile = textFile + text + "\n\n"
+                }
+                
+                do {
+                    try textFile.write(to: NSURL(fileURLWithPath: fileNameGenerateExport) as URL  , atomically: true, encoding: .utf8)
+                } catch {
+                    NCContentPresenter.shared.messageNotification("_error_", description: "_error_creation_file_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.info, errorCode: 0)
                     return
                 }
-                let page = PDFPage.image(UIImage(data: data)!)
-                pdfPages.append(page)
+            }
+        }
+        #endif
+        
+        if fileType == "PDF" {
+            
+            let pdfData = NSMutableData()
+            if password.count > 0 {
+                let info: [AnyHashable: Any] = [kCGPDFContextUserPassword as String : password, kCGPDFContextOwnerPassword as String : password]
+                UIGraphicsBeginPDFContextToData(pdfData, CGRect.zero, info)
+            } else {
+                UIGraphicsBeginPDFContextToData(pdfData, CGRect.zero, nil)
+            }
+            let context = UIGraphicsGetCurrentContext()
+            
+            for var image in self.arrayImages {
+                
+                #if GOOGLEMOBILEVISION
+                if self.form.formRow(withTag: "textRecognition")!.value as! Int == 1 {
+                    
+                    UIGraphicsBeginPDFPageWithInfo(CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height), nil)
+                    UIImageView.init(image:image).layer.render(in: context!)
+                    
+                    if let features = self.textDetector?.features(in: image, options: nil) as? [GMVTextBlockFeature] {
+                        for textBlock in features {
+                            for textLine in textBlock.lines {
+                                
+                                let bounds = textLine.bounds
+                                let text = textLine.value!
+                                var fontColor = UIColor.clear
+                                
+                                #if targetEnvironment(simulator)
+                                fontColor = UIColor.red
+                                #endif
+                                
+                                //print(text)
+                                
+                                let font = UIFont.systemFont(ofSize: bounds.size.height, weight: .regular)
+                                let bestFittingFont = NCUtility.sharedInstance.bestFittingFont(for: text, in: bounds, fontDescriptor: font.fontDescriptor)
+                                
+                                text.draw(in: bounds, withAttributes: [NSAttributedString.Key.font: bestFittingFont, NSAttributedString.Key.foregroundColor: fontColor])
+                            }
+                        }
+                    }
+                    
+                } else {
+                    
+                    image = changeImageFromQuality(image, dpiQuality: dpiQuality)
+                    
+                    UIGraphicsBeginPDFPageWithInfo(CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height), nil)
+                    UIImageView.init(image:image).layer.render(in: context!)
+                }
+                #else
+                image = changeImageFromQuality(image, dpiQuality: dpiQuality)
+                
+                UIGraphicsBeginPDFPageWithInfo(CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height), nil)
+                UIImageView.init(image:image).layer.render(in: context!)
+                #endif
             }
             
+            UIGraphicsEndPDFContext();
+            
             do {
-                try PDFGenerator.generate(pdfPages, to: fileNameGenerateExport, password: password)
+                try pdfData.write(toFile: fileNameGenerateExport, options: .atomic)
             } catch {
-                self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
-                return
+                print("error catched")
             }
         }
         
@@ -375,14 +537,14 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
             let image =  changeImageFromQuality(self.arrayImages[0], dpiQuality: dpiQuality)
             
             guard let data = image.jpegData(compressionQuality: CGFloat(0.5)) else {
-                self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+                NCContentPresenter.shared.messageNotification("_error_", description: "_error_creation_file_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.info, errorCode: 0)
                 return
             }
             
             do {
                 try data.write(to: NSURL.fileURL(withPath: fileNameGenerateExport), options: .atomic)
             } catch {
-                self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+                NCContentPresenter.shared.messageNotification("_error_", description: "_error_creation_file_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.info, errorCode: 0)
                 return
             }
         }
@@ -392,19 +554,19 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         
         metadataForUpload.account = self.appDelegate.activeAccount
         metadataForUpload.date = NSDate()
-        metadataForUpload.directoryID = directoryID
-        metadataForUpload.fileID = fileID
+        metadataForUpload.ocId = ocId
         metadataForUpload.fileName = fileNameSave
         metadataForUpload.fileNameView = fileNameSave
+        metadataForUpload.serverUrl = serverUrl
         metadataForUpload.session = k_upload_session
         metadataForUpload.sessionSelector = selectorUploadFile
         metadataForUpload.status = Int(k_metadataStatusWaitUpload)
         
         _ = NCManageDatabase.sharedInstance.addMetadata(metadataForUpload)
-        self.appDelegate.perform(#selector(self.appDelegate.loadAutoDownloadUpload), on: Thread.main, with: nil, waitUntilDone: true)
-        
-        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: self.serverUrl, fileID: nil, action: Int32(k_action_NULL))
-        
+        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: self.serverUrl, ocId: nil, action: Int32(k_action_NULL))
+
+        self.appDelegate.startLoadAutoDownloadUpload()
+                        
         // Request delete all image scanned
         let alertController = UIAlertController(title: "", message: NSLocalizedString("_delete_all_scanned_images_", comment: ""), preferredStyle: .alert)
         
@@ -455,7 +617,7 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
         viewController.titleButtonDone = NSLocalizedString("_select_", comment: "")
         viewController.type = ""
         
-        navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
+        navigationController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
         self.present(navigationController, animated: true, completion: nil)
     }
     
@@ -483,6 +645,8 @@ class NCCreateFormUploadScanDocument: XLFormViewController, NCSelectDelegate {
     }
 }
 
+@available(iOS 11, *)
+
 class NCCreateScanDocument : NSObject, ImageScannerControllerDelegate {
     
     @objc static let sharedInstance: NCCreateScanDocument = {
@@ -492,15 +656,18 @@ class NCCreateScanDocument : NSObject, ImageScannerControllerDelegate {
     
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
     var viewController: UIViewController?
-    var openScan: Bool = false
     
-    func openScannerDocument(viewController: UIViewController, openScan: Bool) {
+    func openScannerDocument(viewController: UIViewController) {
         
         self.viewController = viewController
-        self.openScan = openScan
         
         let scannerVC = ImageScannerController()
         scannerVC.imageScannerDelegate = self
+        scannerVC.navigationBar.isTranslucent = false
+        scannerVC.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand
+        scannerVC.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText
+        scannerVC.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: NCBrandColor.sharedInstance.brandText]
+        
         self.viewController?.present(scannerVC, animated: true, completion: nil)
     }
     
@@ -508,13 +675,24 @@ class NCCreateScanDocument : NSObject, ImageScannerControllerDelegate {
         
         let fileName = CCUtility.createFileName("scan.png", fileDate: Date(), fileType: PHAssetMediaType.image, keyFileName: k_keyFileNameMask, keyFileNameType: k_keyFileNameType, keyFileNameOriginal: k_keyFileNameOriginal)!
         let fileNamePath = CCUtility.getDirectoryScan() + "/" + fileName
+        let image: UIImage?
         
-        do {
-            try results.scannedImage.pngData()?.write(to: NSURL.fileURL(withPath: fileNamePath), options: .atomic)
-        } catch { }
+        if results.doesUserPreferEnhancedScan {
+            image = results.enhancedScan?.image
+        } else {
+            image = results.croppedScan.image
+        }
         
+        if image != nil {
+            do {
+                try image!.pngData()?.write(to: NSURL.fileURL(withPath: fileNamePath))
+            } catch { }
+        }
+
         scanner.dismiss(animated: true, completion: {
-            if (self.openScan) {
+            if self.viewController is DragDropViewController {
+                (self.viewController as! DragDropViewController).loadImage()
+            } else {
                 let storyboard = UIStoryboard(name: "Scan", bundle: nil)
                 let controller = storyboard.instantiateInitialViewController()!
                 
@@ -529,8 +707,7 @@ class NCCreateScanDocument : NSObject, ImageScannerControllerDelegate {
     }
     
     func imageScannerController(_ scanner: ImageScannerController, didFailWithError error: Error) {
-        appDelegate.messageNotification("_error_", description: error.localizedDescription, visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: Int(k_CCErrorInternalError))
+        NCContentPresenter.shared.messageNotification("_error_", description: error.localizedDescription, delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.error, errorCode: Int(k_CCErrorInternalError))
     }
 }
-
 

@@ -25,8 +25,10 @@ extension PopupViewProtocol where Self: UIView {
         return frame
     }
     func setupPopupFrame() {
-        if self.originalFrame != self.popupView.frame {
+        if self.originalFrame == CGRect.zero {
             self.originalFrame = self.popupView.frame
+        }else {
+            self.originalFrame.size.height = self.popupView.frame.height
         }
     }
     func show(_ show: Bool, duration: TimeInterval = 0.1) {
@@ -52,11 +54,11 @@ extension PopupViewProtocol where Self: UIView {
     }
 }
 
-open class TLAlbumPopView: UIView,PopupViewProtocol {
-    @IBOutlet var bgView: UIView!
-    @IBOutlet var popupView: UIView!
+open class TLAlbumPopView: UIView, PopupViewProtocol {
+    @IBOutlet open var bgView: UIView!
+    @IBOutlet open var popupView: UIView!
     @IBOutlet var popupViewHeight: NSLayoutConstraint!
-    @IBOutlet var tableView: UITableView!
+    @IBOutlet open var tableView: UITableView!
     @objc var originalFrame = CGRect.zero
     @objc var show = false
     
@@ -69,7 +71,10 @@ open class TLAlbumPopView: UIView,PopupViewProtocol {
         self.popupView.layer.cornerRadius = 5.0
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(tapBgView))
         self.bgView.addGestureRecognizer(tapGesture)
-        self.tableView.register(UINib(nibName: "TLCollectionTableViewCell", bundle: Bundle(for: TLCollectionTableViewCell.self)), forCellReuseIdentifier: "TLCollectionTableViewCell")
+        self.tableView.register(UINib(nibName: "TLCollectionTableViewCell", bundle: TLBundle.bundle()), forCellReuseIdentifier: "TLCollectionTableViewCell")
+        if #available(iOS 13.0, *) {
+            self.popupView.backgroundColor = .systemBackground
+        }
     }
     
     @objc func tapBgView() {

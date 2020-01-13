@@ -1,6 +1,6 @@
 //
 //  CCManageAutoUpload.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 01/09/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -24,7 +24,6 @@
 #import "XLFormViewController.h"
 #import "CCMain.h"
 #import "CCManageLocation.h"
-#import "CCMedia.h"
 
 @interface CCManageAutoUpload : XLFormViewController
 

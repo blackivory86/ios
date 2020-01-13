@@ -25,54 +25,56 @@ import Foundation
 
 class NCViewerDocumentWeb: NSObject {
     
+    let appDelegate = UIApplication.shared.delegate as! AppDelegate
+    var safeAreaBottom: Int = 0
+    var mimeType: String?
+    
     @objc static let sharedInstance: NCViewerDocumentWeb = {
         let instance = NCViewerDocumentWeb()
         return instance
     }()
     
-    let appDelegate = UIApplication.shared.delegate as! AppDelegate
-    var safeAreaBottom: Int = 0
-    
     @objc func viewDocumentWebAt(_ metadata: tableMetadata, detail: CCDetail) {
         
-        if !CCUtility.fileProviderStorageExists(metadata.fileID, fileNameView: metadata.fileNameView) {
+        if !CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
             detail.navigationController?.popViewController(animated: true)
             return
         }
         
-        guard let rootView = UIApplication.shared.keyWindow else {
-            return
-        }
-        
         if #available(iOS 11.0, *) {
-            safeAreaBottom = Int(rootView.safeAreaInsets.bottom)
+            safeAreaBottom = Int((UIApplication.shared.keyWindow?.safeAreaInsets.bottom)!)
         }
         
         let fileNamePath = NSTemporaryDirectory() + metadata.fileNameView
         let fileNameExtension = (metadata.fileNameView as NSString).pathExtension.uppercased()
 
-        do {
-            try FileManager.default.removeItem(atPath:fileNamePath)
-        } catch { }
-        
-        do {
-            try FileManager.default.linkItem(atPath: CCUtility.getDirectoryProviderStorageFileID(metadata.fileID, fileNameView: metadata.fileNameView), toPath: fileNamePath)
-        } catch {
-            print("error")
-            return
-        }
+        CCUtility.copyFile(atPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView), toPath: fileNamePath)
         
         let url = URL.init(fileURLWithPath: fileNamePath)
 
         let preferences = WKPreferences()
         let configuration = WKWebViewConfiguration()
 
-        preferences.javaScriptEnabled = true
+        preferences.javaScriptEnabled = false
+
+        // Detect file xls, xlss for enable javascript
+        if fileNameExtension == "XLS" || fileNameExtension == "XLSX" {
+            if let fileHandle = FileHandle(forReadingAtPath: fileNamePath) {
+                let data = fileHandle.readData(ofLength: 4)
+                if data.starts(with: [0x50, 0x4b, 0x03, 0x04]) { // "PK\003\004"
+                    preferences.javaScriptEnabled = true
+                }
+                fileHandle.closeFile()
+            }
+        }
+        
         configuration.preferences = preferences
         
-        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: Int(rootView.bounds.size.width), height: Int(rootView.bounds.size.height) - Int(k_detail_Toolbar_Height) - safeAreaBottom - 1), configuration: configuration)
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: Int(detail.view.bounds.size.width), height: Int(detail.view.bounds.size.height) - Int(k_detail_Toolbar_Height) - safeAreaBottom - 1), configuration: configuration)
+        webView.navigationDelegate = self
         webView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        webView.backgroundColor = NCBrandColor.sharedInstance.backgroundView
+        webView.backgroundColor = .white
+        
         webView.isOpaque = false
         
         if fileNameExtension == "CSS" || fileNameExtension == "PY" || fileNameExtension == "XML" || fileNameExtension == "JS" {
@@ -110,6 +112,7 @@ class NCViewerDocumentWeb: NSObject {
                     guard let encodingName = NCUchardet.sharedNUCharDet()?.encodingStringDetect(with: data) else {
                         return
                     }
+                    self.mimeType = response.mimeType
                     webView.load(data, mimeType: response.mimeType!, characterEncodingName: encodingName, baseURL: url)
                 }
             }
@@ -122,5 +125,35 @@ class NCViewerDocumentWeb: NSObject {
         }
         
         detail.view.addSubview(webView)
+    }
+}
+
+extension NCViewerDocumentWeb: WKNavigationDelegate {
+    
+    public func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if let serverTrust = challenge.protectionSpace.serverTrust {
+            completionHandler(Foundation.URLSession.AuthChallengeDisposition.useCredential, URLCredential(trust: serverTrust))
+        } else {
+            completionHandler(URLSession.AuthChallengeDisposition.useCredential, nil);
+        }
+    }
+    
+    public func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(.allow)
+    }
+    
+    public func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        print("didStartProvisionalNavigation");
+    }
+    
+    public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if self.mimeType != nil && self.mimeType == "text/plain" && CCUtility.getDarkMode() {
+            let js = "document.getElementsByTagName('body')[0].style.webkitTextFillColor= 'white';DOMReady();"
+            webView.evaluateJavaScript(js) { (_, _) in }
+        }
+    }
+    
+    public func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
+        print("didReceiveServerRedirectForProvisionalNavigation");
     }
 }

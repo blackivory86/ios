@@ -1,6 +1,6 @@
 //
 //  CCCellMainTransfer.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 05/05/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -28,6 +28,7 @@
 
 @property(nonatomic, weak) IBOutlet UIImageView *file;
 @property(nonatomic, weak) IBOutlet UIImageView *status;
+@property(nonatomic, weak) IBOutlet UIImageView *user;
 
 @property(nonatomic, weak) IBOutlet UILabel *labelTitle;
 @property(nonatomic, weak) IBOutlet UILabel *labelInfoFile;

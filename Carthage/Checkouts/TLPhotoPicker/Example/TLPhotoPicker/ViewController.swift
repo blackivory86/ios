@@ -46,6 +46,19 @@ class ViewController: UIViewController,TLPhotosPickerViewControllerDelegate {
         viewController.selectedAssets = self.selectedAssets
         self.present(viewController.wrapNavigationControllerWithoutBar(), animated: true, completion: nil)
     }
+    
+    @IBAction func pickerWithCustomBlackStyle() {
+        let viewController = CustomBlackStylePickerViewController()
+        viewController.delegate = self
+        viewController.didExceedMaximumNumberOfSelection = { [weak self] (picker) in
+            self?.showExceededMaximumAlert(vc: picker)
+        }
+        var configure = TLPhotosPickerConfigure()
+        configure.numberOfColumn = 3
+        viewController.configure = configure
+        viewController.selectedAssets = self.selectedAssets
+        self.present(viewController, animated: true, completion: nil)
+    }
 
     @IBAction func pickerWithNavigation() {
         let viewController = PhotoPickerWithNavigationViewController()
@@ -81,6 +94,22 @@ class ViewController: UIViewController,TLPhotosPickerViewControllerDelegate {
         viewController.selectedAssets = self.selectedAssets
         
         self.present(viewController.wrapNavigationControllerWithoutBar(), animated: true, completion: nil)
+    }
+    
+    @IBAction func pickerWithCustomLayout() {
+        let viewController = TLPhotosPickerViewController()
+        viewController.delegate = self
+        viewController.didExceedMaximumNumberOfSelection = { [weak self] (picker) in
+            self?.showExceededMaximumAlert(vc: picker)
+        }
+        viewController.customDataSouces = CustomDataSources()
+        var configure = TLPhotosPickerConfigure()
+        configure.numberOfColumn = 3
+        configure.groupByFetch = .day
+        viewController.configure = configure
+        viewController.selectedAssets = self.selectedAssets
+        viewController.logDelegate = self
+        self.present(viewController, animated: true, completion: nil)
     }
     
     func dismissPhotoPicker(withTLPHAssets: [TLPHAsset]) {

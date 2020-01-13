@@ -23,30 +23,19 @@
 
 #import <MBProgressHUD/MBProgressHUD.h>
 
-#import "OCCommunication.h"
-#import "AFURLSessionManager.h"
-#import "CCNetworking.h"
 #import "OCNetworking.h"
 #import "CCBKPasscode.h"
 #import "CCGlobal.h"
 #import "CCGraphics.h"
 #import "CCCellShareExt.h"
-#import "CCMove.h"
+#import "NCSelectDestination.h"
 #import "CCError.h"
 #import "CCHud.h"
 
-@interface ShareViewController : UIViewController <UITableViewDelegate, OCNetworkingDelegate, MBProgressHUDDelegate, BKPasscodeViewControllerDelegate, CCNetworkingDelegate, CCMoveDelegate>
-
-@property (nonatomic, strong) NSOperationQueue *networkingOperationQueue;
+@interface ShareViewController : UIViewController <UITableViewDelegate, MBProgressHUDDelegate, BKPasscodeViewControllerDelegate, NCSelectDestinationDelegate, UITextFieldDelegate>
 
 @property (nonatomic, strong) NSString *activeAccount;
-@property (nonatomic, strong) NSString *activeUrl;
-@property (nonatomic, strong) NSString *activeUser;
-@property (nonatomic, strong) NSString *activeUserID;
-@property (nonatomic, strong) NSString *activePassword;
-@property (nonatomic, strong) NSString *activeAccessToken;
 @property (nonatomic, strong) NSString *serverUrl;
-
 @property (nonatomic, retain) NSMutableArray *filesName;
 
 @property (nonatomic, weak) IBOutlet UITableView *shareTable;

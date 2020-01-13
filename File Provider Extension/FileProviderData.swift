@@ -21,12 +21,14 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import FileProvider
+import NCCommunication
 
-class FileProviderData: NSObject {
-    
-    var fileManager = FileManager()
-    
+class fileProviderData: NSObject {
+    @objc static let sharedInstance: fileProviderData = {
+        let instance = fileProviderData()
+        return instance
+    }()
+        
     var account = ""
     var accountUser = ""
     var accountUserID = ""
@@ -35,10 +37,7 @@ class FileProviderData: NSObject {
     var homeServerUrl = ""
         
     // Max item for page
-    let itemForPage = 20
-
-    // List of etag for serverUrl
-    var listServerUrlEtag = [String:String]()
+    let itemForPage = 100
     
     // Anchor
     var currentAnchor: UInt64 = 0
@@ -46,116 +45,101 @@ class FileProviderData: NSObject {
     // Rank favorite
     var listFavoriteIdentifierRank = [String:NSNumber]()
     
-    // Queue for trade-safe
-    let queueTradeSafe = DispatchQueue(label: "com.nextcloud.fileproviderextension.tradesafe", attributes: .concurrent)
-
     // Item for signalEnumerator
     var fileProviderSignalDeleteContainerItemIdentifier = [NSFileProviderItemIdentifier:NSFileProviderItemIdentifier]()
     var fileProviderSignalUpdateContainerItem = [NSFileProviderItemIdentifier:FileProviderItem]()
     var fileProviderSignalDeleteWorkingSetItemIdentifier = [NSFileProviderItemIdentifier:NSFileProviderItemIdentifier]()
     var fileProviderSignalUpdateWorkingSetItem = [NSFileProviderItemIdentifier:FileProviderItem]()
-    
+   
     // UserDefaults
     var ncUserDefaults = UserDefaults(suiteName: NCBrandOptions.sharedInstance.capabilitiesGroups)
     
+    // Error
+    enum FileProviderError: Error {
+        case downloadError
+        case uploadError
+    }
+    
     // MARK: - 
     
-    func setupActiveAccount() -> Bool {
+    func setupActiveAccount(domain: String?, providerExtension: NSFileProviderExtension) -> Bool {
+        
+        var foundAccount: Bool = false
         
         if CCUtility.getDisableFilesApp() || NCBrandOptions.sharedInstance.disable_openin_file {
             return false
         }
-        
-        guard let activeAccount = NCManageDatabase.sharedInstance.getAccountActive() else {
-            return false
+                
+        // NO DOMAIN -> Set default account
+        if domain == nil {
+            
+            guard let tableAccount = NCManageDatabase.sharedInstance.getAccountActive() else { return false }
+            
+            account = tableAccount.account
+            accountUser = tableAccount.user
+            accountUserID = tableAccount.userID
+            accountPassword = CCUtility.getPassword(tableAccount.account)
+            accountUrl = tableAccount.url
+            homeServerUrl = CCUtility.getHomeServerUrlActiveUrl(tableAccount.url)
+            
+            NCCommunicationCommon.sharedInstance.setup(username: accountUser, userID: accountUserID,  password: accountPassword, userAgent: CCUtility.getUserAgent(), capabilitiesGroup: NCBrandOptions.sharedInstance.capabilitiesGroups, delegate: NCNetworking.sharedInstance)
+            NCNetworking.sharedInstance.setup(account: tableAccount.account, delegate: providerExtension as? NCNetworkingDelegate)
+            
+            return true
         }
         
-        if account == "" {
-            queueTradeSafe.sync(flags: .barrier) {
-                account = activeAccount.account
-                accountUser = activeAccount.user
-                accountUserID = activeAccount.userID
-                accountPassword = activeAccount.password
-                accountUrl = activeAccount.url
-                homeServerUrl = CCUtility.getHomeServerUrlActiveUrl(activeAccount.url)
-            }
-        } else if account != activeAccount.account {
-            assert(false, "change user")
-        }
+        let tableAccounts = NCManageDatabase.sharedInstance.getAllAccount()
+        if tableAccounts.count == 0 { return false }
         
-        CCNetworking.shared().settingAccount()
-        
-        return true
-    }
-    
-    // MARK: -
-    
-    func getAccountFromItemIdentifier(_ itemIdentifier: NSFileProviderItemIdentifier) -> String? {
-        
-        let fileID = itemIdentifier.rawValue
-        return NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", fileID))?.account
-    }
-    
-    func getTableMetadataFromItemIdentifier(_ itemIdentifier: NSFileProviderItemIdentifier) -> tableMetadata? {
-        
-        let fileID = itemIdentifier.rawValue
-        return NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", fileID))
-    }
+        for tableAccount in tableAccounts {
+            guard let url = NSURL(string: tableAccount.url) else { continue }
+            guard let host = url.host else { continue }
+            let accountDomain = tableAccount.userID + " (" + host + ")"
+            if accountDomain == domain {
+                account = tableAccount.account
+                accountUser = tableAccount.user
+                accountUserID = tableAccount.userID
+                guard let password = CCUtility.getPassword(tableAccount.account) else { return false }
+                accountPassword = password
+                accountUrl = tableAccount.url
+                homeServerUrl = CCUtility.getHomeServerUrlActiveUrl(tableAccount.url)
+                
+                NCCommunicationCommon.sharedInstance.setup(username: accountUser, userID: accountUserID, password: accountPassword, userAgent: CCUtility.getUserAgent(), capabilitiesGroup: NCBrandOptions.sharedInstance.capabilitiesGroups, delegate: NCNetworking.sharedInstance)
+                NCNetworking.sharedInstance.setup(account: tableAccount.account, delegate: providerExtension as? NCNetworkingDelegate)
 
-    func getItemIdentifier(metadata: tableMetadata) -> NSFileProviderItemIdentifier {
-        
-        return NSFileProviderItemIdentifier(metadata.fileID)
-    }
-    
-    func createFileIdentifierOnFileSystem(metadata: tableMetadata) {
-        
-        let itemIdentifier = getItemIdentifier(metadata: metadata)
-        
-        if metadata.directory {
-            CCUtility.getDirectoryProviderStorageFileID(itemIdentifier.rawValue)
-        } else {
-            CCUtility.getDirectoryProviderStorageFileID(itemIdentifier.rawValue, fileNameView: metadata.fileNameView)
-        }
-    }
-    
-    func getParentItemIdentifier(metadata: tableMetadata) -> NSFileProviderItemIdentifier? {
-        
-        if let directory = NCManageDatabase.sharedInstance.getTableDirectory(predicate: NSPredicate(format: "directoryID == %@", metadata.directoryID))  {
-            if directory.serverUrl == homeServerUrl {
-                return NSFileProviderItemIdentifier(NSFileProviderItemIdentifier.rootContainer.rawValue)
-            } else {
-                // get the metadata.FileID of parent Directory
-                if let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", directory.fileID))  {
-                    let identifier = getItemIdentifier(metadata: metadata)
-                    return identifier
-                }
+                foundAccount = true
             }
         }
         
-        return nil
+        return foundAccount
     }
     
-    func getTableDirectoryFromParentItemIdentifier(_ parentItemIdentifier: NSFileProviderItemIdentifier) -> tableDirectory? {
+    func setupActiveAccount(itemIdentifier: NSFileProviderItemIdentifier, providerExtension: NSFileProviderExtension) -> Bool {
         
-        var predicate: NSPredicate
+        var foundAccount: Bool = false
+
+        guard let accountFromItemIdentifier = fileProviderUtility.sharedInstance.getAccountFromItemIdentifier(itemIdentifier) else { return false }
         
-        if parentItemIdentifier == .rootContainer {
-            
-            predicate = NSPredicate(format: "account == %@ AND serverUrl == %@", account, homeServerUrl)
-            
-        } else {
-            
-            guard let metadata = getTableMetadataFromItemIdentifier(parentItemIdentifier) else {
-                return nil
+        let tableAccounts = NCManageDatabase.sharedInstance.getAllAccount()
+        if tableAccounts.count == 0 { return false }
+        
+        for tableAccount in tableAccounts {
+            if accountFromItemIdentifier == tableAccount.account {
+                account = tableAccount.account
+                accountUser = tableAccount.user
+                accountUserID = tableAccount.userID
+                accountPassword = CCUtility.getPassword(tableAccount.account)
+                accountUrl = tableAccount.url
+                homeServerUrl = CCUtility.getHomeServerUrlActiveUrl(tableAccount.url)
+                
+                NCCommunicationCommon.sharedInstance.setup(username: accountUser, userID: accountUserID, password: accountPassword, userAgent: CCUtility.getUserAgent(), capabilitiesGroup: NCBrandOptions.sharedInstance.capabilitiesGroups, delegate: NCNetworking.sharedInstance)
+                NCNetworking.sharedInstance.setup(account: tableAccount.account, delegate: providerExtension as? NCNetworkingDelegate)
+                
+                foundAccount = true
             }
-            predicate = NSPredicate(format: "fileID == %@", metadata.fileID)
         }
         
-        guard let directory = NCManageDatabase.sharedInstance.getTableDirectory(predicate: predicate) else {
-            return nil
-        }
-        
-        return directory
+        return foundAccount
     }
     
     // MARK: -
@@ -164,26 +148,17 @@ class FileProviderData: NSObject {
         
         var updateWorkingSet = false
         let oldListFavoriteIdentifierRank = listFavoriteIdentifierRank
-        listFavoriteIdentifierRank = NCManageDatabase.sharedInstance.getTableMetadatasDirectoryFavoriteIdentifierRank()
+        listFavoriteIdentifierRank = NCManageDatabase.sharedInstance.getTableMetadatasDirectoryFavoriteIdentifierRank(account: account)
         
         // (ADD)
         for (identifier, _) in listFavoriteIdentifierRank {
             
-            if !oldListFavoriteIdentifierRank.keys.contains(identifier) {
+            guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "ocId == %@", identifier)) else { continue }
+            guard let parentItemIdentifier = fileProviderUtility.sharedInstance.getParentItemIdentifier(metadata: metadata, homeServerUrl: homeServerUrl) else { continue }
+            let item = FileProviderItem(metadata: metadata, parentItemIdentifier: parentItemIdentifier)
                 
-                guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", identifier)) else {
-                    continue
-                }
-                guard let parentItemIdentifier = getParentItemIdentifier(metadata: metadata) else {
-                    continue
-                }
-                
-                let item = FileProviderItem(metadata: metadata, parentItemIdentifier: parentItemIdentifier, providerData: self)
-                queueTradeSafe.sync(flags: .barrier) {
-                    fileProviderSignalUpdateWorkingSetItem[item.itemIdentifier] = item
-                }
-                updateWorkingSet = true
-            }
+            fileProviderSignalUpdateWorkingSetItem[item.itemIdentifier] = item
+            updateWorkingSet = true
         }
         
         // (REMOVE)
@@ -191,14 +166,10 @@ class FileProviderData: NSObject {
             
             if !listFavoriteIdentifierRank.keys.contains(identifier) {
                 
-                guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", identifier)) else {
-                    continue
-                }
+                guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "ocId == %@", identifier)) else { continue }
+                let itemIdentifier = fileProviderUtility.sharedInstance.getItemIdentifier(metadata: metadata)
                 
-                let itemIdentifier = getItemIdentifier(metadata: metadata)
-                queueTradeSafe.sync(flags: .barrier) {
-                    fileProviderSignalDeleteWorkingSetItemIdentifier[itemIdentifier] = itemIdentifier
-                }
+                fileProviderSignalDeleteWorkingSetItemIdentifier[itemIdentifier] = itemIdentifier
                 updateWorkingSet = true
             }
         }
@@ -224,72 +195,5 @@ class FileProviderData: NSObject {
                 }
             }
         }
-    }
-    
-    // MARK: -
-    
-    func copyFile(_ atPath: String, toPath: String) -> Error? {
-        
-        var errorResult: Error?
-        
-        if !fileManager.fileExists(atPath: atPath) {
-            return NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError, userInfo:[:])
-        }
-        
-        do {
-            try fileManager.removeItem(atPath: toPath)
-        } catch let error {
-            print("error: \(error)")
-        }
-        do {
-            try fileManager.copyItem(atPath: atPath, toPath: toPath)
-        } catch let error {
-            errorResult = error
-        }
-        
-        return errorResult
-    }
-    
-    func moveFile(_ atPath: String, toPath: String) -> Error? {
-        
-        var errorResult: Error?
-        
-        if atPath == toPath {
-            return nil
-        }
-                
-        if !fileManager.fileExists(atPath: atPath) {
-            return NSError(domain: NSCocoaErrorDomain, code: NSFileNoSuchFileError, userInfo:[:])
-        }
-        
-        do {
-            try fileManager.removeItem(atPath: toPath)
-        } catch let error {
-            print("error: \(error)")
-        }
-        do {
-            try fileManager.moveItem(atPath: atPath, toPath: toPath)
-        } catch let error {
-            errorResult = error
-        }
-        
-        return errorResult
-    }
-    
-    func deleteFile(_ atPath: String) -> Error? {
-        
-        var errorResult: Error?
-        
-        do {
-            try fileManager.removeItem(atPath: atPath)
-        } catch let error {
-            errorResult = error
-        }
-        
-        return errorResult
-    }
-    
-    func fileExists(atPath: String) -> Bool {
-        return fileManager.fileExists(atPath: atPath)
     }
 }

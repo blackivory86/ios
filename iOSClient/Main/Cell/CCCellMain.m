@@ -1,6 +1,6 @@
 //
 //  CCCellMain.m
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 05/05/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -22,6 +22,7 @@
 //
 
 #import "CCCellMain.h"
+#import "NCBridgeSwift.h"
 
 @implementation CCCellMain
 

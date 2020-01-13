@@ -1,6 +1,6 @@
 //
 //  NCText.swift
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 24/07/17.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -48,16 +48,9 @@ class NCText: UIViewController, UITextViewDelegate {
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.keyboardWillShowHandle(info:)), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector:#selector(self.keyboardWillHideHandle), name: UIResponder.keyboardWillHideNotification, object: nil)
-
-        self.navigationController?.navigationBar.topItem?.title = NSLocalizedString("_untitled_txt_", comment: "")
-        self.navigationController?.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand
-        self.navigationController?.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText
-        self.navigationController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: NCBrandColor.sharedInstance.brandText]
-        self.navigationController?.navigationBar.isTranslucent = false
-
-        self.navigationController?.toolbar.barTintColor = NCBrandColor.sharedInstance.brandText
-        self.navigationController?.toolbar.tintColor = NCBrandColor.sharedInstance.brandElement
         
+        self.navigationController?.navigationBar.topItem?.title = NSLocalizedString("_untitled_txt_", comment: "")
+                
         cancelButton.title = NSLocalizedString("_cancel_", comment: "")
         nextButton.title = NSLocalizedString("_next_", comment: "")
         
@@ -65,7 +58,7 @@ class NCText: UIViewController, UITextViewDelegate {
         if let metadata = metadata {
             
             loadText = ""
-            let path = CCUtility.getDirectoryProviderStorageFileID(metadata.fileID, fileNameView: metadata.fileNameView)!
+            let path = CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView)!
             let data = NSData(contentsOfFile: path)
             
             if let data = data {
@@ -89,8 +82,12 @@ class NCText: UIViewController, UITextViewDelegate {
         textView.becomeFirstResponder()
         textView.delegate = self
         textView.selectedTextRange = textView.textRange(from: textView.beginningOfDocument, to: textView.beginningOfDocument)
-        //textView.font = UIFont(name: "NameOfTheFont", size: 20)
+        textView.font = UIFont(name: "NameOfTheFont", size: 20)
 
+        // Theming view
+        NotificationCenter.default.addObserver(self, selector: #selector(self.changeTheming), name: NSNotification.Name(rawValue: "changeTheming"), object: nil)
+        changeTheming()
+        
         textViewDidChange(textView)
     }
 
@@ -109,6 +106,10 @@ class NCText: UIViewController, UITextViewDelegate {
         }
     }
     
+    override func viewDidDisappear(_ animated: Bool) {
+        appDelegate.activeDetail?.viewFile()
+    }
+    
     @objc func keyboardWillHideHandle() {
         bottomConstraint.constant = 0
     }
@@ -120,6 +121,14 @@ class NCText: UIViewController, UITextViewDelegate {
         } else {
             nextButton.isEnabled = true
         }
+    }
+    
+    @objc func changeTheming() {
+    
+        appDelegate.changeTheming(self, tableView: nil, collectionView: nil, form: false)
+        
+        textView.backgroundColor = NCBrandColor.sharedInstance.backgroundForm
+        textView.textColor = NCBrandColor.sharedInstance.textView
     }
     
     @IBAction func cancelButtonTapped(_ sender: AnyObject) {
@@ -160,7 +169,7 @@ class NCText: UIViewController, UITextViewDelegate {
             if textView.text != loadText {
             
                 let data = textView.text.data(using: .utf8)
-                let success = FileManager.default.createFile(atPath: CCUtility.getDirectoryProviderStorageFileID(metadata.fileID, fileNameView: metadata.fileNameView), contents: data, attributes: nil)
+                let success = FileManager.default.createFile(atPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView), contents: data, attributes: nil)
                 if success {
                 
                     appDelegate.activeMain.clearDateReadDataSource(nil)
@@ -172,15 +181,15 @@ class NCText: UIViewController, UITextViewDelegate {
                         metadata.status = Int(k_metadataStatusWaitUpload)
 
                         _ = NCManageDatabase.sharedInstance.addMetadata(metadata)
-                        self.appDelegate.perform(#selector(self.appDelegate.loadAutoDownloadUpload), on: Thread.main, with: nil, waitUntilDone: true)
+                        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: metadata.ocId, action: Int32(k_action_MOD))
                         
-                        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: metadata.fileID, action: Int32(k_action_MOD))
+                        self.appDelegate.startLoadAutoDownloadUpload()
 
                         self.delegate?.dismissTextView()
                     })
 
                 } else {
-                    self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: Int(k_CCErrorInternalError))
+                    NCContentPresenter.shared.messageNotification("_error_", description: "_error_creation_file_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.error, errorCode: Int(k_CCErrorInternalError))
                 }
                 
             } else {

@@ -23,20 +23,68 @@
 
 import Foundation
 import TLPhotoPicker
+import ZIPFoundation
 
-class NCMainCommon: NSObject {
+//MARK: - Main Common
+
+class NCMainCommon: NSObject, PhotoEditorDelegate, NCAudioRecorderViewControllerDelegate, UIDocumentInteractionControllerDelegate {
     
     @objc static let sharedInstance: NCMainCommon = {
         let instance = NCMainCommon()
+        instance.createImagesThemingColor()
         return instance
     }()
     
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
-    let operationQueueReloadDatasource = OperationQueue.main
+    var metadataEditPhoto: tableMetadata?
+    var docController: UIDocumentInteractionController?
+
+    lazy var operationQueueReloadDatasource: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "Reload main datasource queue"
+        queue.maxConcurrentOperationCount = 1
+        return queue
+    }()
     
     //MARK: -
     
-    @objc func triggerProgressTask(_ notification: Notification, sectionDataSourceFileIDIndexPath: NSDictionary, tableView: UITableView, viewController: UIViewController, serverUrlViewController: String?) {
+    struct NCMainCommonImages {
+        static var cellSharedImage = UIImage()
+        static var cellCanShareImage = UIImage()
+        static var cellShareByLinkImage = UIImage()
+        static var cellFavouriteImage = UIImage()
+        static var cellMoreImage = UIImage()
+        static var cellCommentImage = UIImage()
+        
+        static var cellFolderEncryptedImage = UIImage()
+        static var cellFolderSharedWithMeImage = UIImage()
+        static var cellFolderPublicImage = UIImage()
+        static var cellFolderGroupImage = UIImage()
+        static var cellFolderExternalImage = UIImage()
+        static var cellFolderAutomaticUploadImage = UIImage()
+        static var cellFolderImage = UIImage()
+    }
+    
+    @objc func createImagesThemingColor() {
+        NCMainCommonImages.cellSharedImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), width: 100, height: 100, color: NCBrandColor.sharedInstance.textView)
+        NCMainCommonImages.cellCanShareImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), width: 100, height: 100, color: NCBrandColor.sharedInstance.graySoft)
+        NCMainCommonImages.cellShareByLinkImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "sharebylink"), width: 100, height: 100, color: NCBrandColor.sharedInstance.textView)
+        NCMainCommonImages.cellFavouriteImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "favorite"), width: 100, height: 100, color: NCBrandColor.sharedInstance.yellowFavorite)
+        NCMainCommonImages.cellMoreImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "more"), width: 50, height: 50, color: NCBrandColor.sharedInstance.optionItem)
+        NCMainCommonImages.cellCommentImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "comment"), width: 30, height: 30, color: NCBrandColor.sharedInstance.graySoft)
+        
+        NCMainCommonImages.cellFolderEncryptedImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folderEncrypted"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+        NCMainCommonImages.cellFolderSharedWithMeImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_shared_with_me"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+        NCMainCommonImages.cellFolderPublicImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_public"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+        NCMainCommonImages.cellFolderGroupImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_group"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+        NCMainCommonImages.cellFolderExternalImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_external"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+        NCMainCommonImages.cellFolderAutomaticUploadImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folderAutomaticUpload"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+        NCMainCommonImages.cellFolderImage = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder"), width: 600, height: 600, color: NCBrandColor.sharedInstance.brandElement)
+    }
+    
+    //MARK: -
+    
+    @objc func triggerProgressTask(_ notification: Notification, sectionDataSourceocIdIndexPath: NSDictionary, tableView: UITableView, viewController: UIViewController, serverUrlViewController: String?) {
         
         if viewController.viewIfLoaded?.window == nil {
             return
@@ -46,20 +94,25 @@ class NCMainCommon: NSObject {
             return
         }
         
-        let fileID = dic["fileID"] as! NSString
-        let serverUrl = dic["serverUrl"] as! String
-        let status = dic["status"] as! Int
-        let progress = dic["progress"] as! CGFloat
-        let totalBytes = dic["totalBytes"] as! Double
-        let totalBytesExpected = dic["totalBytesExpected"] as! Double
+        let account = dic["account"] as? NSString ?? ""
+        let ocId = dic["ocId"] as? NSString ?? ""
+        let serverUrl = dic["serverUrl"] as? String ?? ""
+        let status = dic["status"] as? Int ?? Int(k_taskIdentifierDone)
+        let progress = dic["progress"] as? CGFloat ?? 0
+        let totalBytes = dic["totalBytes"] as? Double ?? 0
+        let totalBytesExpected = dic["totalBytesExpected"] as? Double ?? 0
+        
+        if (account != self.appDelegate.activeAccount! as NSString) && !(viewController is CCTransfers) {
+            return
+        }
         
         if serverUrlViewController != nil && serverUrlViewController! != serverUrl {
             return
         }
         
-        appDelegate.listProgressMetadata.setObject([progress as NSNumber, totalBytes as NSNumber, totalBytesExpected as NSNumber], forKey: fileID)
+        appDelegate.listProgressMetadata.setObject([progress as NSNumber, totalBytes as NSNumber, totalBytesExpected as NSNumber], forKey: ocId)
         
-        guard let indexPath = sectionDataSourceFileIDIndexPath.object(forKey: fileID) else {
+        guard let indexPath = sectionDataSourceocIdIndexPath.object(forKey: ocId) else {
             return
         }
         
@@ -75,52 +128,19 @@ class NCMainCommon: NSObject {
                     image = "↑"
                 }
                 
-                cell.labelInfoFile.text = CCUtility.transformedSize(totalBytesExpected) + " - " + image + CCUtility.transformedSize(totalBytes)
-                cell.transferButton.progress = progress
+                cell.labelInfoFile?.text = CCUtility.transformedSize(totalBytesExpected) + " - " + image + CCUtility.transformedSize(totalBytes)
+                cell.transferButton?.progress = progress
             }
         }
     }
     
-    @objc func cancelTransferMetadata(_ metadata: tableMetadata, reloadDatasource: Bool) {
+    @objc func cancelTransferMetadata(_ metadata: tableMetadata, reloadDatasource: Bool, uploadStatusForcedStart: Bool) {
         
         var actionReloadDatasource = k_action_NULL
+        var metadata = metadata
         
-        if metadata.session.count == 0 {
-            return
-        }
-        
-        guard let session = CCNetworking.shared().getSessionfromSessionDescription(metadata.session) else {
-            return
-        }
-        
-        guard let serverUrl = NCManageDatabase.sharedInstance.getServerUrl(metadata.directoryID) else {
-            return
-        }
-        
-        // SESSION EXTENSION
-        if metadata.session == k_download_session_extension || metadata.session == k_upload_session_extension {
-            
-            if (metadata.session == k_upload_session_extension) {
-                
-                do {
-                    try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageFileID(metadata.fileID))
-                } catch { }
-                
-                NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "fileID == %@", metadata.fileID), clearDateReadDirectoryID: metadata.directoryID)
-                
-                actionReloadDatasource = k_action_DEL
-                
-            } else {
-                
-                NCManageDatabase.sharedInstance.setMetadataSession("", sessionError: "", sessionSelector: "", sessionTaskIdentifier: Int(k_taskIdentifierDone), status: Int(k_metadataStatusNormal), predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
-                
-                actionReloadDatasource = k_action_MOD
-            }
-            
-            self.reloadDatasource(ServerUrl: serverUrl, fileID: metadata.fileID, action: actionReloadDatasource)
-            
-            return
-        }
+        if metadata.session.count == 0 { return }
+        guard let session = CCNetworking.shared().getSessionfromSessionDescription(metadata.session) else { return }
         
         session.getTasksWithCompletionHandler { (dataTasks, uploadTasks, downloadTasks) in
             
@@ -135,7 +155,7 @@ class NCMainCommon: NSObject {
                     }
                 }
                 if cancel == false {
-                    NCManageDatabase.sharedInstance.setMetadataSession("", sessionError: "", sessionSelector: "", sessionTaskIdentifier: Int(k_taskIdentifierDone), status: Int(k_metadataStatusNormal), predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
+                    NCManageDatabase.sharedInstance.setMetadataSession("", sessionError: "", sessionSelector: "", sessionTaskIdentifier: Int(k_taskIdentifierDone), status: Int(k_metadataStatusNormal), predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
                 }
                 actionReloadDatasource = k_action_MOD
             }
@@ -144,35 +164,37 @@ class NCMainCommon: NSObject {
             if metadata.session.count > 0 && metadata.session.contains("upload") {
                 for task in uploadTasks {
                     if task.taskIdentifier == metadata.sessionTaskIdentifier {
+                        if uploadStatusForcedStart {
+                            metadata.status = Int(k_metadataStatusUploadForcedStart)
+                            metadata = NCManageDatabase.sharedInstance.addMetadata(metadata) ?? metadata
+                        }
                         task.cancel()
                         cancel = true
                     }
                 }
                 if cancel == false {
                     do {
-                        try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageFileID(metadata.fileID))
+                        try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId))
                     }
                     catch { }
-                    NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "fileID == %@", metadata.fileID), clearDateReadDirectoryID: metadata.directoryID)
+                    NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
                 }
                 actionReloadDatasource = k_action_DEL
             }
             
-            if cancel == false {
-                self.reloadDatasource(ServerUrl: serverUrl, fileID: metadata.fileID, action: actionReloadDatasource)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                self.reloadDatasource(ServerUrl: metadata.serverUrl, ocId: metadata.ocId, action: actionReloadDatasource)
             }
         }
     }
     
-    @objc func cancelAllTransfer(view: UIView) {
+    @objc func cancelAllTransfer() {
         
         // Delete k_metadataStatusWaitUpload OR k_metadataStatusUploadError
-        NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "account == %@ AND (status == %d OR status == %d)", appDelegate.activeAccount, k_metadataStatusWaitUpload, k_metadataStatusUploadError), clearDateReadDirectoryID: nil)
+        NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "status == %d OR status == %d", appDelegate.activeAccount, k_metadataStatusWaitUpload, k_metadataStatusUploadError))
         
-        NCUtility.sharedInstance.startActivityIndicator(view: view)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if let metadatas = NCManageDatabase.sharedInstance.getMetadatas(predicate: NSPredicate(format: "account == %@ AND status != %d AND status != %d", self.appDelegate.activeAccount, k_metadataStatusNormal, k_metadataStatusHide), sorted: "fileName", ascending: true)  {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let metadatas = NCManageDatabase.sharedInstance.getMetadatas(predicate: NSPredicate(format: "status != %d AND status != %d", k_metadataStatusNormal, k_metadataStatusHide), sorted: "fileName", ascending: true)  {
                 
                 for metadata in metadatas {
                     
@@ -187,42 +209,38 @@ class NCMainCommon: NSObject {
                     
                     // Cancel Task
                     if metadata.status == k_metadataStatusDownloading || metadata.status == k_metadataStatusUploading {
-                        self.cancelTransferMetadata(metadata, reloadDatasource: false)
+                        self.cancelTransferMetadata(metadata, reloadDatasource: false, uploadStatusForcedStart: false)
                     }
                 }
             }
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.reloadDatasource(ServerUrl: nil, fileID: nil, action: k_action_NULL)
-            NCUtility.sharedInstance.stopActivityIndicator()
+            return
         }
     }
     
     //MARK: -
     
-    func collectionViewCellForItemAt(_ indexPath: IndexPath, collectionView: UICollectionView, typeLayout: String, metadata: tableMetadata, metadataFolder: tableMetadata?, serverUrl: String, isEditMode: Bool, selectFileID: [String], autoUploadFileName: String, autoUploadDirectory: String, hideButtonMore: Bool, source: UIViewController) -> UICollectionViewCell {
+    func collectionViewCellForItemAt(_ indexPath: IndexPath, collectionView: UICollectionView, cell: UICollectionViewCell, metadata: tableMetadata, metadataFolder: tableMetadata?, serverUrl: String, isEditMode: Bool, selectocId: [String], autoUploadFileName: String, autoUploadDirectory: String, hideButtonMore: Bool, downloadThumbnail: Bool, shares: [tableShare]?, source: UIViewController) {
         
-        var image: UIImage?
-        var imagePreview = false
+        var tableShare: tableShare?
         
-        if metadata.iconName.count > 0 {
-            image = UIImage.init(named: metadata.iconName)
-        } else {
-            image = UIImage.init(named: "file")
-        }
-        
-        if FileManager().fileExists(atPath: CCUtility.getDirectoryProviderStorageIconFileID(metadata.fileID, fileNameView: metadata.fileName)) {
-            image = UIImage.init(contentsOfFile: CCUtility.getDirectoryProviderStorageIconFileID(metadata.fileID, fileNameView: metadata.fileName))
-            imagePreview = true
+        // Share
+        if shares != nil {
+            for share in shares! {
+                if share.fileName == metadata.fileName {
+                    tableShare = share
+                    break
+                }
+            }
         }
         
         // Download preview
-        NCNetworkingMain.sharedInstance.downloadThumbnail(with: metadata, serverUrl: serverUrl, view: collectionView, indexPath: indexPath, forceDownload: false)
+        if downloadThumbnail {
+            NCNetworkingMain.sharedInstance.downloadThumbnail(with: metadata, view: collectionView, indexPath: indexPath)
+        }
         
-        // Share
-        let sharesLink = appDelegate.sharesLink.object(forKey: serverUrl + metadata.fileName)
-        let sharesUserAndGroup = appDelegate.sharesUserAndGroup.object(forKey: serverUrl + metadata.fileName)
         var isShare = false
         var isMounted = false
         
@@ -231,40 +249,41 @@ class NCMainCommon: NSObject {
             isMounted = metadata.permissions.contains(k_permission_mounted) && !metadataFolder!.permissions.contains(k_permission_mounted)
         }
         
-        if typeLayout == k_layout_list {
+        if cell is NCListCell {
             
-            // LIST
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "listCell", for: indexPath) as! NCListCell
+            let cell = cell as! NCListCell
+           
             cell.delegate = source as? NCListCellDelegate
             
-            cell.fileID = metadata.fileID
+            cell.objectId = metadata.ocId
             cell.indexPath = indexPath
             cell.labelTitle.text = metadata.fileNameView
+            cell.labelTitle.textColor = NCBrandColor.sharedInstance.textView
             cell.imageStatus.image = nil
             cell.imageLocal.image = nil
             cell.imageFavorite.image = nil
-            cell.imageShare.image = nil
-            cell.hide(buttonMore: hideButtonMore, hideImageShare: true)
+            cell.shared.image = nil
             
             if metadata.directory {
                 
                 if metadata.e2eEncrypted {
-                    image = UIImage.init(named: "folderEncrypted")
-                } else if metadata.fileName == autoUploadFileName && serverUrl == autoUploadDirectory {
-                    image = UIImage.init(named: "folderAutomaticUpload")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderEncryptedImage
                 } else if isShare {
-                    image = UIImage.init(named: "folder_shared_with_me")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderSharedWithMeImage
+                } else if (tableShare != nil && tableShare!.shareType != Int(shareTypeLink.rawValue)) {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderSharedWithMeImage
+                } else if (tableShare != nil && tableShare!.shareType == Int(shareTypeLink.rawValue)) {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderPublicImage
+                } else if metadata.mountType == "group" {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderGroupImage
                 } else if isMounted {
-                    image = UIImage.init(named: "folder_external")
-                } else if (sharesUserAndGroup != nil) {
-                    image = UIImage.init(named: "folder_shared_with_me")
-                } else if (sharesLink != nil) {
-                    image = UIImage.init(named: "folder_public")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderExternalImage
+                } else if metadata.fileName == autoUploadFileName && serverUrl == autoUploadDirectory {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderAutomaticUploadImage
                 } else {
-                    image = UIImage.init(named: "folder")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderImage
                 }
                 
-                cell.imageItem.image = CCGraphics.changeThemingColorImage(image, multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
                 cell.labelInfo.text = CCUtility.dateDiff(metadata.date as Date)
                 
                 let lockServerUrl = CCUtility.stringAppendServerUrl(serverUrl, addFileName: metadata.fileName)!
@@ -282,46 +301,74 @@ class NCMainCommon: NSObject {
                 
             } else {
                 
-                cell.imageItem.image = image
+                if FileManager().fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileName)) {
+                    NCUtility.sharedInstance.loadImage(ocId: metadata.ocId, fileNameView: metadata.fileNameView) { (image) in
+                        cell.imageItem.image = image
+                    }
+                } else {
+                    if metadata.iconName.count > 0 {
+                        cell.imageItem.image = UIImage.init(named: metadata.iconName)
+                    } else {
+                        cell.imageItem.image = UIImage.init(named: "file")
+                    }
+                }
+                
                 cell.labelInfo.text = CCUtility.dateDiff(metadata.date as Date) + ", " + CCUtility.transformedSize(metadata.size)
                 
                 // image Local
-                let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
-                if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.fileID, fileNameView: metadata.fileNameView) {
+                let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+                if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
                     if tableLocalFile!.offline { cell.imageLocal.image = UIImage.init(named: "offlineFlag") }
                     else { cell.imageLocal.image = UIImage.init(named: "local") }
-                }
-                
-                // Share
-                if (isShare) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
-                } else if (isMounted) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "shareMounted"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
-                } else if (sharesLink != nil) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "sharebylink"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
-                } else if (sharesUserAndGroup != nil) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
                 }
             }
             
             // image Favorite
             if metadata.favorite {
-                cell.imageFavorite.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "favorite"), multiplier: 2, color: NCBrandColor.sharedInstance.yellowFavorite)
+                cell.imageFavorite.image = NCMainCommonImages.cellFavouriteImage
+            }
+            
+            // Share image
+            if (isShare) {
+                cell.shared.image = NCMainCommonImages.cellSharedImage
+            } else if (tableShare != nil && tableShare!.shareType == Int(shareTypeLink.rawValue)) {
+                cell.shared.image = NCMainCommonImages.cellShareByLinkImage
+            } else if (tableShare != nil && tableShare!.shareType != Int(shareTypeLink.rawValue)) {
+                cell.shared.image = NCMainCommonImages.cellSharedImage
+            } else {
+                cell.shared.image = NCMainCommonImages.cellCanShareImage
+            }
+            if metadata.ownerId != appDelegate.activeUserID {
+                // Load avatar
+                let fileNameSource = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(appDelegate.activeUser, activeUrl: appDelegate.activeUrl) + "-" + metadata.ownerId + ".png"
+                let fileNameSourceAvatar = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(appDelegate.activeUser, activeUrl: appDelegate.activeUrl) + "-avatar-" + metadata.ownerId + ".png"
+                if FileManager.default.fileExists(atPath: fileNameSourceAvatar) {
+                    cell.shared.image = UIImage(contentsOfFile: fileNameSourceAvatar)
+                } else if FileManager.default.fileExists(atPath: fileNameSource) {
+                    cell.shared.image = NCUtility.sharedInstance.createAvatar(fileNameSource: fileNameSource, fileNameSourceAvatar: fileNameSourceAvatar)
+                } else {
+                    let url = appDelegate.activeUrl + k_avatar + metadata.ownerId + "/" + k_avatar_size
+                    let encodedString = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+                    OCNetworking.sharedManager()?.downloadContents(ofUrl: encodedString, completion: { (data, message, errorCode) in
+                        if errorCode == 0 {
+                            do {
+                                try data!.write(to: NSURL(fileURLWithPath: fileNameSource) as URL, options: .atomic)
+                                cell.shared.image = NCUtility.sharedInstance.createAvatar(fileNameSource: fileNameSource, fileNameSourceAvatar: fileNameSourceAvatar)
+                            } catch {  }
+                        }
+                    })
+                }
             }
             
             if isEditMode {
                 cell.imageItemLeftConstraint.constant = 45
                 cell.imageSelect.isHidden = false
                 
-                if selectFileID.contains(metadata.fileID) {
-                    cell.imageSelect.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "checkedYes"), multiplier: 2, color: NCBrandColor.sharedInstance.brand)
+                if selectocId.contains(metadata.ocId) {
+                    cell.imageSelect.image = CCGraphics.scale(UIImage.init(named: "checkedYes"), to: CGSize(width: 50, height: 50), isAspectRation: true)
                     cell.backgroundView = NCUtility.sharedInstance.cellBlurEffect(with: cell.bounds)
                 } else {
-                    cell.imageSelect.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "checkedNo"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
+                    cell.imageSelect.image = CCGraphics.scale(UIImage.init(named: "checkedNo"), to: CGSize(width: 50, height: 50), isAspectRation: true)
                     cell.backgroundView = nil
                 }
             } else {
@@ -337,44 +384,41 @@ class NCMainCommon: NSObject {
                 cell.separator.isHidden = false
             }
             
-            return cell
+        } else if cell is NCGridCell {
             
-        } else {
-            
-            // GRID
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "gridCell", for: indexPath) as! NCGridCell
+            let cell = cell as! NCGridCell
+
             cell.delegate = source as? NCGridCellDelegate
             
-            cell.fileID = metadata.fileID
+            cell.objectId = metadata.ocId
             cell.indexPath = indexPath
             cell.labelTitle.text = metadata.fileNameView
+            cell.labelTitle.textColor = NCBrandColor.sharedInstance.textView
             cell.imageStatus.image = nil
             cell.imageLocal.image = nil
             cell.imageFavorite.image = nil
-            cell.imageShare.image = nil
-            cell.hide(buttonMore: hideButtonMore, hideImageShare: true)
             
             if metadata.directory {
                 
                 if metadata.e2eEncrypted {
-                    image = UIImage.init(named: "folderEncrypted")
-                } else if metadata.fileName == autoUploadFileName && serverUrl == autoUploadDirectory {
-                    image = UIImage.init(named: "folderAutomaticUpload")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderEncryptedImage
                 } else if isShare {
-                    image = UIImage.init(named: "folder_shared_with_me")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderSharedWithMeImage
+                } else if (tableShare != nil && tableShare!.shareType != Int(shareTypeLink.rawValue)) {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderSharedWithMeImage
+                } else if (tableShare != nil && tableShare!.shareType == Int(shareTypeLink.rawValue)) {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderPublicImage
+                } else if metadata.mountType == "group" {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderGroupImage
                 } else if isMounted {
-                    image = UIImage.init(named: "folder_external")
-                } else if (sharesUserAndGroup != nil) {
-                    image = UIImage.init(named: "folder_shared_with_me")
-                } else if (sharesLink != nil) {
-                    image = UIImage.init(named: "folder_public")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderExternalImage
+                } else if metadata.fileName == autoUploadFileName && serverUrl == autoUploadDirectory {
+                    cell.imageItem.image = NCMainCommonImages.cellFolderAutomaticUploadImage
                 } else {
-                    image = UIImage.init(named: "folder")
+                    cell.imageItem.image = NCMainCommonImages.cellFolderImage
                 }
                 
-                cell.imageItem.image = CCGraphics.changeThemingColorImage(image, width: image!.size.width*6, height: image!.size.height*6, scale: 3.0, color: NCBrandColor.sharedInstance.brandElement)
-                cell.imageItem.contentMode = .center
-                
+    
                 let lockServerUrl = CCUtility.stringAppendServerUrl(serverUrl, addFileName: metadata.fileName)!
                 let tableDirectory = NCManageDatabase.sharedInstance.getTableDirectory(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@", appDelegate.activeAccount, lockServerUrl))
                 
@@ -390,46 +434,35 @@ class NCMainCommon: NSObject {
                 
             } else {
                 
-                cell.imageItem.image = image
-                if imagePreview == false {
-                    let width = cell.imageItem.image!.size.width * 2
-                    //let scale = UIScreen.main.scale
-                    cell.imageItem.image = NCUtility.sharedInstance.resizeImage(image: image!, newWidth: width)
-                    cell.imageItem.contentMode = .center
+                if FileManager().fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileName)) {
+                    NCUtility.sharedInstance.loadImage(ocId: metadata.ocId, fileNameView: metadata.fileNameView) { (image) in
+                        cell.imageItem.image = image
+                    }
+                } else {
+                    if metadata.iconName.count > 0 {
+                        cell.imageItem.image = UIImage.init(named: metadata.iconName)
+                    } else {
+                        cell.imageItem.image = UIImage.init(named: "file")
+                    }
                 }
                 
                 // image Local
-                let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
-                if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.fileID, fileNameView: metadata.fileNameView) {
+                let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+                if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
                     if tableLocalFile!.offline { cell.imageLocal.image = UIImage.init(named: "offlineFlag") }
                     else { cell.imageLocal.image = UIImage.init(named: "local") }
-                }
-                
-                // Share
-                if (isShare) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
-                } else if (isMounted) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "shareMounted"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
-                } else if (sharesLink != nil) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "sharebylink"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
-                } else if (sharesUserAndGroup != nil) {
-                    cell.imageShare.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                    cell.hide(buttonMore: hideButtonMore, hideImageShare: false)
                 }
             }
             
             // image Favorite
             if metadata.favorite {
-                cell.imageFavorite.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "favorite"), multiplier: 2, color: NCBrandColor.sharedInstance.yellowFavorite)
+                cell.imageFavorite.image = NCMainCommonImages.cellFavouriteImage
             }
             
             if isEditMode {
                 cell.imageSelect.isHidden = false
-                if selectFileID.contains(metadata.fileID) {
-                    cell.imageSelect.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "checkedYes"), multiplier: 2, color: UIColor.white)
+                if selectocId.contains(metadata.ocId) {
+                    cell.imageSelect.image = CCGraphics.scale(UIImage.init(named: "checkedYes"), to: CGSize(width: 50, height: 50), isAspectRation: true)
                     cell.backgroundView = NCUtility.sharedInstance.cellBlurEffect(with: cell.bounds)
                 } else {
                     cell.imageSelect.isHidden = true
@@ -439,17 +472,64 @@ class NCMainCommon: NSObject {
                 cell.imageSelect.isHidden = true
                 cell.backgroundView = nil
             }
-            return cell
+            
+        } else if cell is NCGridMediaCell {
+            
+            let cell = cell as! NCGridMediaCell
+            
+            cell.imageStatus.image = nil
+            cell.imageLocal.image = nil
+            cell.imageFavorite.image = nil
+            
+            if FileManager().fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileName)) {
+                cell.imageItem.image = UIImage.init(contentsOfFile: CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileName))
+//                NCUtility.sharedInstance.loadImage(ocId: metadata.ocId, fileNameView: metadata.fileNameView) { (image) in
+//                    cell.imageItem.image = image
+//                }
+            } else {
+                if metadata.iconName.count > 0 {
+                    cell.imageItem.image = UIImage.init(named: metadata.iconName)
+                } else {
+                    cell.imageItem.image = UIImage.init(named: "file")
+                }
+            }
+            
+            // image Local
+            let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+            if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
+                if tableLocalFile!.offline { cell.imageLocal.image = UIImage.init(named: "offlineFlag") }
+                else { cell.imageLocal.image = UIImage.init(named: "local") }
+            }
+            
+            // image Favorite
+            if metadata.favorite {
+                cell.imageFavorite.image = NCMainCommonImages.cellFavouriteImage
+            }
+            
+            if isEditMode {
+                cell.imageSelect.isHidden = false
+                if selectocId.contains(metadata.ocId) {
+                    cell.imageSelect.image = CCGraphics.scale(UIImage.init(named: "checkedYes"), to: CGSize(width: 50, height: 50), isAspectRation: true)
+                    cell.imageVisualEffect.isHidden = false
+                    cell.imageVisualEffect.alpha = 0.4
+                } else {
+                    cell.imageSelect.isHidden = true
+                    cell.imageVisualEffect.isHidden = true
+                }
+            } else {
+                cell.imageSelect.isHidden = true
+                cell.imageVisualEffect.isHidden = true
+            }
         }
     }
     
-    @objc func cellForRowAtIndexPath(_ indexPath: IndexPath, tableView: UITableView ,metadata: tableMetadata, metadataFolder: tableMetadata?, serverUrl: String, autoUploadFileName: String, autoUploadDirectory: String) -> UITableViewCell {
+    @objc func cellForRowAtIndexPath(_ indexPath: IndexPath, tableView: UITableView ,metadata: tableMetadata, metadataFolder: tableMetadata?, serverUrl: String, autoUploadFileName: String, autoUploadDirectory: String, tableShare: tableShare?) -> UITableViewCell {
         
         // Create File System
         if metadata.directory {
-            CCUtility.getDirectoryProviderStorageFileID(metadata.fileID)
+            CCUtility.getDirectoryProviderStorageOcId(metadata.ocId)
         } else {
-            CCUtility.getDirectoryProviderStorageFileID(metadata.fileID, fileNameView: metadata.fileNameView)
+            CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView)
         }
         
         // CCCell
@@ -465,26 +545,24 @@ class NCMainCommon: NSObject {
             cell.favorite.image = nil
             cell.shared.image = nil
             cell.local.image = nil
-            cell.imageTitleSegue = nil
+            cell.comment.image = nil
             cell.shared.isUserInteractionEnabled = false
-            
+            cell.viewShared.backgroundColor = NCBrandColor.sharedInstance.backgroundView
             cell.backgroundColor = NCBrandColor.sharedInstance.backgroundView
             
             // change color selection
             let selectionColor = UIView()
-            selectionColor.backgroundColor = NCBrandColor.sharedInstance.getColorSelectBackgrond()
+            selectionColor.backgroundColor = NCBrandColor.sharedInstance.select
             cell.selectedBackgroundView = selectionColor
             cell.tintColor = NCBrandColor.sharedInstance.brandElement
             
-            cell.labelTitle.textColor = UIColor.black
+            cell.labelTitle.textColor = NCBrandColor.sharedInstance.textView
             cell.labelTitle.text = metadata.fileNameView
             
             // Download preview
-            NCNetworkingMain.sharedInstance.downloadThumbnail(with: metadata, serverUrl: serverUrl, view: tableView, indexPath: indexPath, forceDownload: false)
+            NCNetworkingMain.sharedInstance.downloadThumbnail(with: metadata, view: tableView, indexPath: indexPath)
             
             // Share
-            let sharesLink = appDelegate.sharesLink.object(forKey: serverUrl + metadata.fileName)
-            let sharesUserAndGroup = appDelegate.sharesUserAndGroup.object(forKey: serverUrl + metadata.fileName)
             var isShare = false
             var isMounted = false
             
@@ -500,25 +578,21 @@ class NCMainCommon: NSObject {
                 
                 // File Image & Image Title Segue
                 if metadata.e2eEncrypted {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folderEncrypted"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
-                    cell.imageTitleSegue = UIImage.init(named: "lock")
-                } else if metadata.fileName == autoUploadFileName && serverUrl == autoUploadDirectory {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folderAutomaticUpload"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
-                    cell.imageTitleSegue = UIImage.init(named: "media")
+                    cell.file.image = NCMainCommonImages.cellFolderEncryptedImage
                 } else if isShare {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_shared_with_me"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
-                    cell.imageTitleSegue = UIImage.init(named: "share")
+                    cell.file.image = NCMainCommonImages.cellFolderSharedWithMeImage
+                } else if (tableShare != nil && tableShare!.shareType != Int(shareTypeLink.rawValue)) {
+                    cell.file.image = NCMainCommonImages.cellFolderSharedWithMeImage
+                } else if (tableShare != nil && tableShare!.shareType == Int(shareTypeLink.rawValue)) {
+                    cell.file.image = NCMainCommonImages.cellFolderPublicImage
+                } else if metadata.mountType == "group" {
+                    cell.file.image = NCMainCommonImages.cellFolderGroupImage
                 } else if isMounted {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_external"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
-                    cell.imageTitleSegue = UIImage.init(named: "shareMounted")
-                } else if (sharesUserAndGroup != nil) {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_shared_with_me"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
-                    cell.imageTitleSegue = UIImage.init(named: "share")
-                } else if (sharesLink != nil) {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder_public"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
-                    cell.imageTitleSegue = UIImage.init(named: "sharebylink")
+                    cell.file.image = NCMainCommonImages.cellFolderExternalImage
+                } else if metadata.fileName == autoUploadFileName && serverUrl == autoUploadDirectory {
+                    cell.file.image = NCMainCommonImages.cellFolderAutomaticUploadImage
                 } else {
-                    cell.file.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "folder"), multiplier: 3, color: NCBrandColor.sharedInstance.brandElement)
+                    cell.file.image = NCMainCommonImages.cellFolderImage
                 }
                 
                 let lockServerUrl = CCUtility.stringAppendServerUrl(serverUrl, addFileName: metadata.fileName)!
@@ -534,14 +608,16 @@ class NCMainCommon: NSObject {
                 
             } else {
                 
-                let iconFileExists = FileManager.default.fileExists(atPath: CCUtility.getDirectoryProviderStorageIconFileID(metadata.fileID, fileNameView: metadata.fileNameView))
+                let iconFileExists = FileManager.default.fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileNameView))
                 
                 // Lable Info
                 cell.labelInfoFile.text = CCUtility.dateDiff(metadata.date as Date) + ", " + CCUtility.transformedSize(metadata.size)
                 
                 // File Image
                 if iconFileExists {
-                    cell.file.image = UIImage.init(contentsOfFile: CCUtility.getDirectoryProviderStorageIconFileID(metadata.fileID, fileNameView: metadata.fileNameView))
+                    NCUtility.sharedInstance.loadImage(ocId: metadata.ocId, fileNameView: metadata.fileNameView) { (image) in
+                        cell.file.image = image
+                    }
                 } else {
                     if metadata.iconName.count > 0 {
                         cell.file.image = UIImage.init(named: metadata.iconName)
@@ -551,8 +627,8 @@ class NCMainCommon: NSObject {
                 }
                 
                 // Local Image - Offline
-                let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
-                if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.fileID, fileNameView: metadata.fileNameView) {
+                let tableLocalFile = NCManageDatabase.sharedInstance.getTableLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+                if tableLocalFile != nil && CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
                     if tableLocalFile!.offline { cell.local.image = UIImage.init(named: "offlineFlag") }
                     else { cell.local.image = UIImage.init(named: "local") }
                 }
@@ -562,17 +638,6 @@ class NCMainCommon: NSObject {
                 if tableE2eEncryption != nil &&  NCUtility.sharedInstance.isEncryptedMetadata(metadata) {
                     cell.status.image = UIImage.init(named: "encrypted")
                 }
-                
-                // Share
-                if (isShare) {
-                    cell.shared.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                } else if (isMounted) {
-                    cell.shared.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "shareMounted"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                } else if (sharesLink != nil) {
-                    cell.shared.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "sharebylink"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                } else if (sharesUserAndGroup != nil) {
-                    cell.shared.image =  CCGraphics.changeThemingColorImage(UIImage.init(named: "share"), multiplier: 2, color: NCBrandColor.sharedInstance.optionItem)
-                }
             }
             
             //
@@ -581,11 +646,55 @@ class NCMainCommon: NSObject {
             
             // Favorite
             if metadata.favorite {
-                cell.favorite.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "favorite"), multiplier: 2, color: NCBrandColor.sharedInstance.yellowFavorite)
+                cell.favorite.image = NCMainCommonImages.cellFavouriteImage
+            }
+            
+            // Share image
+            if (isShare) {
+                cell.shared.image = NCMainCommonImages.cellSharedImage
+            } else if (tableShare != nil && tableShare!.shareType == Int(shareTypeLink.rawValue)) {
+                cell.shared.image = NCMainCommonImages.cellShareByLinkImage
+            } else if (tableShare != nil && tableShare!.shareType != Int(shareTypeLink.rawValue)) {
+                cell.shared.image = NCMainCommonImages.cellSharedImage
+            } else {
+                cell.shared.image = NCMainCommonImages.cellCanShareImage
+            }
+            if metadata.ownerId != appDelegate.activeUserID {
+                // Load avatar
+                let fileNameSource = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(appDelegate.activeUser, activeUrl: appDelegate.activeUrl) + "-" + metadata.ownerId + ".png"
+                let fileNameSourceAvatar = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(appDelegate.activeUser, activeUrl: appDelegate.activeUrl) + "-avatar-" + metadata.ownerId + ".png"
+                if FileManager.default.fileExists(atPath: fileNameSourceAvatar) {
+                    if let avatar = UIImage(contentsOfFile: fileNameSourceAvatar) {
+                        cell.shared.image = avatar
+                    }
+                } else if FileManager.default.fileExists(atPath: fileNameSource) {
+                    if let avatar = NCUtility.sharedInstance.createAvatar(fileNameSource: fileNameSource, fileNameSourceAvatar: fileNameSourceAvatar) {
+                        cell.shared.image = avatar
+                    }
+                } else {
+                    let url = appDelegate.activeUrl + k_avatar + metadata.ownerId + "/" + k_avatar_size
+                    let encodedString = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+                    OCNetworking.sharedManager()?.downloadContents(ofUrl: encodedString, completion: { (data, message, errorCode) in
+                        if errorCode == 0 {
+                            do {
+                                try data!.write(to: NSURL(fileURLWithPath: fileNameSource) as URL, options: .atomic)
+                                 cell.shared.image = NCUtility.sharedInstance.createAvatar(fileNameSource: fileNameSource, fileNameSourceAvatar: fileNameSourceAvatar)
+                            } catch {  }
+                        }
+                    })
+                }
+            }
+            
+            // Comment
+            if metadata.commentsUnread {
+                cell.comment.image = NCMainCommonImages.cellCommentImage
+                cell.labelTitleTrailingConstraint.constant = 160
+            } else {
+                cell.labelTitleTrailingConstraint.constant = 110
             }
             
             // More Image
-            cell.more.image = CCGraphics.changeThemingColorImage(UIImage.init(named: "more"), multiplier: 1, color: NCBrandColor.sharedInstance.optionItem)
+            cell.more.image = NCMainCommonImages.cellMoreImage
             
             return cell
             
@@ -598,18 +707,19 @@ class NCMainCommon: NSObject {
             cell.accessoryType = UITableViewCell.AccessoryType.none
             cell.file.image = nil
             cell.status.image = nil
+            cell.user.image = nil
             
             cell.backgroundColor = NCBrandColor.sharedInstance.backgroundView
 
-            cell.labelTitle.textColor = UIColor.black
             cell.labelTitle.text = metadata.fileNameView
+            cell.labelTitle.textColor = NCBrandColor.sharedInstance.textView
             
             cell.transferButton.tintColor = NCBrandColor.sharedInstance.optionItem
             
             var progress: CGFloat = 0.0
             var totalBytes: Double = 0.0
             //var totalBytesExpected : Double = 0
-            let progressArray = appDelegate.listProgressMetadata.object(forKey: metadata.fileID) as? NSArray
+            let progressArray = appDelegate.listProgressMetadata.object(forKey: metadata.ocId) as? NSArray
             if progressArray != nil && progressArray?.count == 3 {
                 progress = progressArray?.object(at: 0) as! CGFloat
                 totalBytes = progressArray?.object(at: 1) as! Double
@@ -645,10 +755,12 @@ class NCMainCommon: NSObject {
                 progress = 0.0
             }
             
-            let iconFileExists = FileManager.default.fileExists(atPath: CCUtility.getDirectoryProviderStorageIconFileID(metadata.fileID, fileNameView: metadata.fileNameView))
+            let iconFileExists = FileManager.default.fileExists(atPath: CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileNameView))
 
             if iconFileExists {
-                cell.file.image = UIImage.init(contentsOfFile: CCUtility.getDirectoryProviderStorageIconFileID(metadata.fileID, fileNameView: metadata.fileNameView))
+                NCUtility.sharedInstance.loadImage(ocId: metadata.ocId, fileNameView: metadata.fileNameView) { (image) in
+                    cell.file.image = image
+                }
             } else {
                 if metadata.iconName.count > 0 {
                     cell.file.image = UIImage.init(named: metadata.iconName)
@@ -658,7 +770,7 @@ class NCMainCommon: NSObject {
             }
             
             // Session Upload Extension
-            if metadata.session == k_upload_session_extension && (metadata.status == k_metadataStatusInUpload || metadata.status == k_metadataStatusUploading) {
+            if metadata.session == k_upload_session_extension {
                 
                 cell.labelTitle.isEnabled = false
                 cell.labelInfoFile.isEnabled = false
@@ -716,6 +828,25 @@ class NCMainCommon: NSObject {
             // Progress
             cell.transferButton.progress = progress
             
+            // User
+            if metadata.account != appDelegate.activeAccount {
+                let tableAccount = NCManageDatabase.sharedInstance.getAccount(predicate: NSPredicate(format: "account == %@", metadata.account))
+                if tableAccount != nil {
+                    let fileNamePath = CCUtility.getDirectoryUserData() + "/" + CCUtility.getStringUser(tableAccount!.user, activeUrl: tableAccount!.url) + "-" + tableAccount!.user + ".png"
+                    var avatar = UIImage.init(contentsOfFile: fileNamePath)
+                    if avatar != nil {
+                        let avatarImageView = CCAvatar.init(image: avatar, borderColor: UIColor.black, borderWidth: 0.5)
+                        let imageSize = avatarImageView?.bounds.size
+                        UIGraphicsBeginImageContext(imageSize!)
+                        let context = UIGraphicsGetCurrentContext()
+                        avatarImageView?.layer.render(in: context!)
+                        avatar = UIGraphicsGetImageFromCurrentImageContext()
+                        UIGraphicsEndImageContext()
+                        cell.user.image = avatar
+                    }
+                }
+            }
+            
             return cell
         }
     }
@@ -748,32 +879,37 @@ class NCMainCommon: NSObject {
             return nil
         }
         
-        let fileID = filesID.object(at: indexPath.row)
-        let metadata = sectionDataSource.allRecordsDataSource.object(forKey: fileID) as? tableMetadata
+        let ocId = filesID.object(at: indexPath.row)
+        let metadata = sectionDataSource.allRecordsDataSource.object(forKey: ocId) as? tableMetadata
       
         return metadata
     }
     
-    @objc func reloadDatasource(ServerUrl: String?, fileID: String?, action: Int32) {
+    @objc func reloadDatasource(ServerUrl: String?, ocId: String?, action: Int32) {
         
         if operationQueueReloadDatasource.operationCount > 0 {
             return
         }
         
-        DispatchQueue.main.async {
-            if self.appDelegate.activeMain != nil && ServerUrl != nil && self.appDelegate.activeMain.serverUrl == ServerUrl {
-                self.operationQueueReloadDatasource.addOperation {
-                    self.appDelegate.activeMain.reloadDatasource(ServerUrl, fileID: fileID, action: Int(action))
+       
+        if self.appDelegate.activeMain != nil && ServerUrl != nil && self.appDelegate.activeMain.serverUrl == ServerUrl {
+            self.operationQueueReloadDatasource.addOperation {
+                DispatchQueue.main.async {
+                    self.appDelegate.activeMain.reloadDatasource(ServerUrl, ocId: ocId, action: Int(action))
                 }
             }
-            if self.appDelegate.activeFavorites != nil && self.appDelegate.activeFavorites.viewIfLoaded?.window != nil {
-                self.operationQueueReloadDatasource.addOperation {
-                    self.appDelegate.activeFavorites.reloadDatasource(fileID, action: Int(action))
+        }
+        if self.appDelegate.activeFavorites != nil && self.appDelegate.activeFavorites.viewIfLoaded?.window != nil {
+            self.operationQueueReloadDatasource.addOperation {
+                DispatchQueue.main.async {
+                    self.appDelegate.activeFavorites.reloadDatasource(ocId, action: Int(action))
                 }
             }
-            if self.appDelegate.activeTransfers != nil && self.appDelegate.activeTransfers.viewIfLoaded?.window != nil {
-                self.operationQueueReloadDatasource.addOperation {
-                    self.appDelegate.activeTransfers.reloadDatasource(fileID, action: Int(action))
+        }
+        if self.appDelegate.activeTransfers != nil && self.appDelegate.activeTransfers.viewIfLoaded?.window != nil {
+            self.operationQueueReloadDatasource.addOperation {
+                DispatchQueue.main.async {
+                    self.appDelegate.activeTransfers.reloadDatasource(ocId, action: Int(action))
                 }
             }
         }
@@ -794,7 +930,7 @@ class NCMainCommon: NSObject {
     
     //MARK: -
     
-    @objc func deleteFile(metadatas: NSArray, e2ee: Bool, serverUrl: String, folderFileID: String, completion: @escaping (_ errorCode: Int, _ message: String)->()) {
+    @objc func deleteFile(metadatas: NSArray, e2ee: Bool, serverUrl: String, folderocId: String, completion: @escaping (_ errorCode: Int, _ message: String)->()) {
         
         var copyMetadatas = [tableMetadata]()
         
@@ -804,18 +940,22 @@ class NCMainCommon: NSObject {
         
         if e2ee {
             DispatchQueue.global().async {
-                let error = NCNetworkingEndToEnd.sharedManager().lockFolderEncrypted(onServerUrl: serverUrl, fileID: folderFileID, user: self.appDelegate.activeUser, userID: self.appDelegate.activeUserID, password: self.appDelegate.activePassword, url: self.appDelegate.activeUrl)
+                let error = NCNetworkingEndToEnd.sharedManager().lockFolderEncrypted(onServerUrl: serverUrl, ocId: folderocId, user: self.appDelegate.activeUser, userID: self.appDelegate.activeUserID, password: self.appDelegate.activePassword, url: self.appDelegate.activeUrl)
                 DispatchQueue.main.async {
                     if error == nil {
                         self.delete(metadatas: copyMetadatas, serverUrl:serverUrl, e2ee: e2ee, completion: completion)
                     } else {
-                        self.appDelegate.messageNotification("_delete_", description: error?.localizedDescription, visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: Int(k_CCErrorInternalError))
+                        NCContentPresenter.shared.messageNotification("_delete_", description: error?.localizedDescription, delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.error, errorCode: Int(k_CCErrorInternalError))
                         return
                     }
                 }
             }
         } else {
-            delete(metadatas: copyMetadatas, serverUrl:serverUrl, e2ee: e2ee, completion: completion)
+            delete(metadatas: copyMetadatas, serverUrl: serverUrl, e2ee: e2ee) { (errorCode, message) in
+                if errorCode != 0 {
+                    NCContentPresenter.shared.messageNotification("_delete_", description: message, delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.error, errorCode: errorCode)
+                }
+            }
         }
     }
     
@@ -824,75 +964,221 @@ class NCMainCommon: NSObject {
         var count: Int = 0
         var completionErrorCode: Int = 0
         var completionMessage = ""
-        
-        let ocNetworking = OCnetworking.init(delegate: nil, metadataNet: nil, withUser: appDelegate.activeUser, withUserID: appDelegate.activeUserID, withPassword: appDelegate.activePassword, withUrl: appDelegate.activeUrl)
-        
+                
         for metadata in metadatas {
             
-            guard let serverUrl = NCManageDatabase.sharedInstance.getServerUrl(metadata.directoryID) else {
-                continue
+            // verify permission
+            let permission = NCUtility.sharedInstance.permissionsContainsString(metadata.permissions, permissions: k_permission_can_delete)
+            if metadata.permissions != "" && permission == false {
+                completion(Int(k_CCErrorInternalError), "_no_permission_delete_file_")
+                return
             }
             
-            self.appDelegate.filterFileID.add(metadata.fileID)
+            self.appDelegate.filterocId.add(metadata.ocId)
             
-            let path = serverUrl + "/" + metadata.fileName
+            let path = metadata.serverUrl + "/" + metadata.fileName
             
-            ocNetworking?.deleteFileOrFolder(path, completion: { (message, errorCode) in
+            OCNetworking.sharedManager().deleteFileOrFolder(withAccount: appDelegate.activeAccount, path: path, completion: { (account, message, errorCode) in
                 
-                count += 1
+                if account == self.appDelegate.activeAccount {
+                    
+                    count += 1
 
-                if errorCode == 0 || errorCode == 404 {
-                    
-                    do {
-                        try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageFileID(metadata.fileID))
-                    } catch { }
-                    
-                    NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "fileID == %@", metadata.fileID), clearDateReadDirectoryID: metadata.directoryID)
-                    NCManageDatabase.sharedInstance.deleteLocalFile(predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
-                    NCManageDatabase.sharedInstance.deletePhotos(fileID: metadata.fileID)
-                    
-                    if metadata.directory {
-                        NCManageDatabase.sharedInstance.deleteDirectoryAndSubDirectory(serverUrl: CCUtility.stringAppendServerUrl(serverUrl, addFileName: metadata.fileName))
-                    }
-                    
-                    if (e2ee) {
-                        NCManageDatabase.sharedInstance.deleteE2eEncryption(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@ AND fileNameIdentifier == %@", metadata.account, serverUrl, metadata.fileName))
-                    }
-                    
-                    self.appDelegate.filterFileID.remove(metadata.fileID)
-                    
-                } else {
-                    
-                    completionErrorCode = errorCode
-                    completionMessage = ""
-                    if message != nil {
-                        completionMessage = message!
-                    }
-                    
-                    self.appDelegate.filterFileID.remove(metadata.fileID)
-                }
-                
-                if count == metadatas.count {
-                    if e2ee {
-                        DispatchQueue.global().async {
-                            NCNetworkingEndToEnd.sharedManager().rebuildAndSendMetadata(onServerUrl: serverUrl, account: self.appDelegate.activeAccount, user: self.appDelegate.activeUser, userID: self.appDelegate.activeUserID, password: self.appDelegate.activePassword, url: self.appDelegate.activeUrl)
-                            DispatchQueue.main.async {
-                                completion(completionErrorCode, completionMessage)
-                            }
+                    if errorCode == 0 || errorCode == kOCErrorServerPathNotFound {
+                        
+                        do {
+                            try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId))
+                        } catch { }
+                        
+                        NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+                        NCManageDatabase.sharedInstance.deleteLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+                        
+                        if metadata.directory {
+                            NCManageDatabase.sharedInstance.deleteDirectoryAndSubDirectory(serverUrl: CCUtility.stringAppendServerUrl(serverUrl, addFileName: metadata.fileName), account: metadata.account)
                         }
+                        
+                        if (e2ee) {
+                            NCManageDatabase.sharedInstance.deleteE2eEncryption(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@ AND fileNameIdentifier == %@", metadata.account, serverUrl, metadata.fileName))
+                        }
+                        
+                        self.appDelegate.filterocId.remove(metadata.ocId)
+                        
                     } else {
-                        completion(completionErrorCode, completionMessage)
+                        
+                        completionErrorCode = errorCode
+                        completionMessage = ""
+                        if message != nil {
+                            completionMessage = message!
+                        }
+                        
+                        self.appDelegate.filterocId.remove(metadata.ocId)
+                    }
+                    
+                    if count == metadatas.count {
+                        if e2ee {
+                            DispatchQueue.global().async {
+                                NCNetworkingEndToEnd.sharedManager().rebuildAndSendMetadata(onServerUrl: serverUrl, account: self.appDelegate.activeAccount, user: self.appDelegate.activeUser, userID: self.appDelegate.activeUserID, password: self.appDelegate.activePassword, url: self.appDelegate.activeUrl)
+                                DispatchQueue.main.async {
+                                    completion(completionErrorCode, completionMessage)
+                                }
+                            }
+                        } else {
+                            completion(completionErrorCode, completionMessage)
+                        }
                     }
                 }
             })
         }
         
-        self.reloadDatasource(ServerUrl: serverUrl, fileID: nil, action: k_action_NULL)
-        self.appDelegate.activeMedia.reloadDatasource(nil, action: Int(k_action_NULL))
+        self.reloadDatasource(ServerUrl: serverUrl, ocId: nil, action: k_action_NULL)
+    }
+    
+    @objc func editPhoto(_ metadata: tableMetadata, viewController: UIViewController) {
+        guard let path = CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView) else {
+            return
+        }
+        guard let image = UIImage(contentsOfFile: path) else {
+            return
+        }
+        
+        self.metadataEditPhoto = metadata
+
+        let photoEditor = PhotoEditorViewController(nibName:"PhotoEditorViewController",bundle: Bundle(for: PhotoEditorViewController.self))
+        
+        photoEditor.image = image
+        photoEditor.photoEditorDelegate = self
+        photoEditor.hiddenControls = [.save, .share, .sticker]
+        
+        photoEditor.cancelButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorCancel")!, multiplier:2, color: .white)
+        photoEditor.cropButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorCrop")!, multiplier:2, color: .white)
+        photoEditor.drawButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorDraw")!, multiplier:2, color: .white)
+        photoEditor.textButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorText")!, multiplier:2, color: .white)
+        photoEditor.clearButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorClear")!, multiplier:2, color: .white)
+        photoEditor.continueButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorDone")!, multiplier:2, color: .white)
+        
+        viewController.present(photoEditor, animated: true, completion: nil)
+    }
+    
+    func doneEditing(image: UIImage) {
+        guard let metadata = self.metadataEditPhoto else {
+            return
+        }
+        guard let path = CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView) else {
+            return
+        }
+        guard let filetype = NCUtility.sharedInstance.isEditImage(metadata.fileNameView as NSString) else {
+            return
+        }
+        if filetype == "PNG" {
+            do {
+                try image.pngData()?.write(to: NSURL(fileURLWithPath:path) as URL, options: .atomic)
+            } catch { return }
+        } else if filetype == "JPG" {
+            let imageData = image.jpegData(compressionQuality: 1)
+            do {
+                try imageData?.write(to: NSURL(fileURLWithPath:path) as URL)
+            } catch { return }
+        }
+        // write icon
+        CCGraphics.createNewImage(from: metadata.fileNameView, ocId: metadata.ocId, extension: filetype, filterGrayScale: false, typeFile: metadata.typeFile, writeImage: true)
+
+        // upload
+        metadata.session = k_upload_session
+        metadata.sessionSelector = selectorUploadFile
+        metadata.status = Int(k_metadataStatusWaitUpload)
+        
+        _ = NCManageDatabase.sharedInstance.addMetadata(metadata)
+    }
+    
+    func canceledEditing() {
+        print("Canceled")
+    }
+    
+    //MARK: - download Open Selector
+    
+    @objc func downloadOpen(metadata: tableMetadata, selector: String) {
+        
+        if CCUtility.fileProviderStorageExists(metadata.ocId, fileNameView: metadata.fileNameView) {
+            
+            NCNetworkingMain.sharedInstance.downloadFileSuccessFailure(metadata.fileName, ocId: metadata.ocId, serverUrl: metadata.serverUrl, selector: selector, errorMessage: "", errorCode: 0)
+                        
+        } else {
+            
+            metadata.session = k_download_session
+            metadata.sessionError = ""
+            metadata.sessionSelector = selector //selectorOpenIn
+            metadata.status = Int(k_metadataStatusWaitDownload)
+            
+            _ = NCManageDatabase.sharedInstance.addMetadata(metadata)
+            reloadDatasource(ServerUrl: metadata.serverUrl, ocId: metadata.ocId, action: k_action_MOD)
+        }
+    }
+
+    //MARK: - OpenIn
+    
+    func openIn(metadata: tableMetadata) {
+        
+        docController = UIDocumentInteractionController(url: NSURL(fileURLWithPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId, fileNameView: metadata.fileNameView)) as URL)
+        docController?.delegate = self
+        
+        guard let splitViewController = self.appDelegate.window?.rootViewController as? UISplitViewController else {
+            return
+        }
+        
+        guard let view = splitViewController.viewControllers.first?.view else {
+            return
+        }
+        
+        guard let frame = splitViewController.viewControllers.first?.view.frame else {
+            return
+        }
+        
+        docController?.presentOptionsMenu(from: frame, in: view, animated: true)
+    }
+    
+    //MARK: - OpenShare
+    @objc func openShare(ViewController: UIViewController, metadata: tableMetadata, indexPage: Int) {
+        
+        let shareNavigationController = UIStoryboard(name: "NCShare", bundle: nil).instantiateInitialViewController() as! UINavigationController
+        let shareViewController = shareNavigationController.topViewController as! NCSharePaging
+        
+        shareViewController.metadata = metadata
+        shareViewController.indexPage = indexPage
+        
+        shareNavigationController.modalPresentationStyle = .formSheet
+        ViewController.present(shareNavigationController, animated: true, completion: nil)
+    }
+    
+    //MARK: - NCAudioRecorder
+    
+    func startAudioRecorder() {
+    
+        let fileName = CCUtility.createFileNameDate(NSLocalizedString("_voice_memo_filename_", comment: ""), extension: "m4a")!
+        let viewController = UIStoryboard(name: "NCAudioRecorderViewController", bundle: nil).instantiateInitialViewController() as! NCAudioRecorderViewController
+    
+        viewController.delegate = self
+        viewController.createRecorder(fileName: fileName)
+        viewController.modalTransitionStyle = .crossDissolve
+        viewController.modalPresentationStyle = UIModalPresentationStyle.overCurrentContext
+    
+        self.appDelegate.window.rootViewController?.present(viewController, animated: true, completion: nil)
+    }
+    
+    func didFinishRecording(_ viewController: NCAudioRecorderViewController, fileName: String) {
+        
+        guard let navigationController = UIStoryboard(name: "NCCreateFormUploadVoiceNote", bundle: nil).instantiateInitialViewController() else { return }
+        navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
+        
+        let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadVoiceNote
+        viewController.setup(serverUrl: appDelegate.activeMain.serverUrl, fileNamePath: NSTemporaryDirectory() + fileName, fileName: fileName)
+        self.appDelegate.window.rootViewController?.present(navigationController, animated: true, completion: nil)
+    }
+    
+    func didFinishWithoutRecording(_ viewController: NCAudioRecorderViewController, fileName: String) {
     }
 }
     
-//MARK: -
+//MARK: - Main TabBarController
 
 class CCMainTabBarController : UITabBarController, UITabBarControllerDelegate {
         
@@ -906,7 +1192,7 @@ class CCMainTabBarController : UITabBarController, UITabBarControllerDelegate {
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
             
         let tabViewControllers = tabBarController.viewControllers!
-        guard let toIndex = tabViewControllers.index(of: viewController) else {
+        guard let toIndex = tabViewControllers.firstIndex(of: viewController) else {
                 
             if let vc = viewController as? UINavigationController {
                 vc.popToRootViewController(animated: true);
@@ -925,13 +1211,13 @@ class CCMainTabBarController : UITabBarController, UITabBarControllerDelegate {
         let tabViewControllers = viewControllers!
         let fromView = selectedViewController!.view!
         let toView = tabViewControllers[toIndex].view!
-        let fromIndex = tabViewControllers.index(of: selectedViewController!)
+        let fromIndex = tabViewControllers.firstIndex(of: selectedViewController!)
             
         guard fromIndex != toIndex else {return}
             
         // Add the toView to the tab bar view
         fromView.superview?.addSubview(toView)
-        fromView.superview?.backgroundColor = UIColor.white
+        fromView.superview?.backgroundColor = NCBrandColor.sharedInstance.backgroundView
             
         // Position toView off screen (to the left/right of fromView)
         let screenWidth = UIScreen.main.bounds.size.width;
@@ -972,7 +1258,7 @@ extension UITabBar {
     }
 }
 
-//MARK: -
+//MARK: - Networking Main
 
 class NCNetworkingMain: NSObject, CCNetworkingDelegate {
 
@@ -981,56 +1267,92 @@ class NCNetworkingMain: NSObject, CCNetworkingDelegate {
         return instance
     }()
     
+    lazy var operationQueueNetworkingMain: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.nextcloud.operationQueueNetworkingMain"
+        queue.maxConcurrentOperationCount = 1
+        return queue
+    }()
+    
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
 
     // DOWNLOAD
-    func downloadStart(_ fileID: String!, account: String!, task: URLSessionDownloadTask!, serverUrl: String!) {
-        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: fileID, action: Int32(k_action_MOD))
+    func downloadStart(_ ocId: String!, account: String!, task: URLSessionDownloadTask!, serverUrl: String!) {
+        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
         appDelegate.updateApplicationIconBadgeNumber()
     }
     
-    func downloadFileSuccessFailure(_ fileName: String!, fileID: String!, serverUrl: String!, selector: String!, errorMessage: String!, errorCode: Int) {
+    func downloadFileSuccessFailure(_ fileName: String!, ocId: String!, serverUrl: String!, selector: String!, errorMessage: String!, errorCode: Int) {
         
-        guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", fileID)) else {
+        guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "ocId == %@", ocId)) else {
+            return
+        }
+        
+        if metadata.account != appDelegate.activeAccount {
+            NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
             return
         }
         
         if errorCode == 0 {
             
-            NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: fileID, action: Int32(k_action_MOD))
+            NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
             
             // Synchronized
             if selector == selectorDownloadSynchronize {
                 appDelegate.updateApplicationIconBadgeNumber()
+                appDelegate.startLoadAutoDownloadUpload()
+                return
+            }
+            
+            // Modify Photo
+            if selector == selectorDownloadEditPhoto {
+                NCMainCommon.sharedInstance.editPhoto(metadata, viewController: appDelegate.activeMain)
                 return
             }
             
             // open View File
-            if selector == selectorLoadFileView && UIApplication.shared.applicationState == UIApplication.State.active {
+            if (selector == selectorLoadFileView || selector == selectorLoadFileInternalView) && UIApplication.shared.applicationState == UIApplication.State.active {
             
                 var uti = CCUtility.insertTypeFileIconName(metadata.fileNameView, metadata: metadata)
                 if uti == nil {
                     uti = ""
-                } else if uti!.contains("opendocument") && !NCViewerRichdocument.sharedInstance.isRichDocument(metadata) {
+                } else if uti!.contains("opendocument") && !NCUtility.sharedInstance.isRichDocument(metadata) {
                     metadata.typeFile = k_metadataTypeFile_unknown
+                }
+                
+                if metadata.typeFile == k_metadataTypeFile_imagemeter {
+                    
+                    if NCBrandOptions.sharedInstance.use_imi_viewer == false {
+                        NCMainCommon.sharedInstance.openIn(metadata: metadata)
+                        return
+                    }
+                    
+                    if !NCUtility.sharedInstance.IMUnzip(metadata: metadata) {
+                        NCContentPresenter.shared.messageNotification("_error_", description: "Bundle imagemeter error. 🤷‍♂️", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.error, errorCode: 0)
+                        return
+                    }
+                    
+                    let storyboard = UIStoryboard(name: "IMImagemeter", bundle: nil)
+                    let imiVC = storyboard.instantiateInitialViewController() as! IMImagemeterViewer
+                    imiVC.metadata = metadata
+                    imiVC.modalPresentationStyle = UIModalPresentationStyle.fullScreen
+                    
+                    self.appDelegate.window.rootViewController?.present(imiVC, animated: true, completion: nil)
+                    
+                    return
                 }
                 
                 if metadata.typeFile == k_metadataTypeFile_compress || metadata.typeFile == k_metadataTypeFile_unknown {
 
-                    if appDelegate.activeMain.view.window != nil {
-                        appDelegate.activeMain.open(in: metadata)
-                    }
-                    if appDelegate.activeFavorites.view.window != nil {
-                        appDelegate.activeFavorites.open(in: metadata)
-                    }
+                    NCMainCommon.sharedInstance.openIn(metadata: metadata)
                     
                 } else {
                     
                     if appDelegate.activeMain.view.window != nil {
-                        appDelegate.activeMain.shouldPerformSegue(metadata)
+                        appDelegate.activeMain.shouldPerformSegue(metadata, selector: selector)
                     }
                     if appDelegate.activeFavorites.view.window != nil {
-                        appDelegate.activeFavorites.shouldPerformSegue(metadata)
+                        appDelegate.activeFavorites.shouldPerformSegue(metadata, selector: selector)
                     }
                 }
             }
@@ -1038,12 +1360,7 @@ class NCNetworkingMain: NSObject, CCNetworkingDelegate {
             // Open in...
             if selector == selectorOpenIn && UIApplication.shared.applicationState == UIApplication.State.active {
 
-                if appDelegate.activeMain.view.window != nil {
-                    appDelegate.activeMain.open(in: metadata)
-                }
-                if appDelegate.activeFavorites.view.window != nil {
-                    appDelegate.activeFavorites.open(in: metadata)
-                }
+                NCMainCommon.sharedInstance.openIn(metadata: metadata)
             }
             
             // Save to Photo Album
@@ -1061,7 +1378,7 @@ class NCNetworkingMain: NSObject, CCNetworkingDelegate {
             // Set as available offline
             if selector == selectorLoadOffline {
                 
-                NCManageDatabase.sharedInstance.setLocalFile(fileID: metadata.fileID, offline: true)
+                NCManageDatabase.sharedInstance.setLocalFile(ocId: metadata.ocId, offline: true)
             }
             
             //selectorLoadViewImage
@@ -1070,12 +1387,9 @@ class NCNetworkingMain: NSObject, CCNetworkingDelegate {
                 if appDelegate.activeDetail != nil {
                     appDelegate.activeDetail.downloadPhotoBrowserSuccessFailure(metadata, selector: selector, errorCode: errorCode)
                 }
-                if appDelegate.activeMedia != nil {
-                    appDelegate.activeMedia.downloadFileSuccessFailure(metadata.fileName, fileID: metadata.fileID, serverUrl: serverUrl, selector: selector, errorMessage: errorMessage, errorCode: errorCode)
-                }
             }
             
-            self.appDelegate.performSelector(onMainThread: #selector(self.appDelegate.loadAutoDownloadUpload), with: nil, waitUntilDone: true)
+            appDelegate.startLoadAutoDownloadUpload()
             
         } else {
             
@@ -1083,14 +1397,13 @@ class NCNetworkingMain: NSObject, CCNetworkingDelegate {
             if (errorCode == kOCErrorServerPathNotFound || errorCode == -1011) { // - 1011 = kCFURLErrorBadServerResponse
                 
                 do {
-                    try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageFileID(metadata.fileID))
+                    try FileManager.default.removeItem(atPath: CCUtility.getDirectoryProviderStorageOcId(metadata.ocId))
                 } catch { }
                 
-                NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "fileID == %@", metadata.fileID), clearDateReadDirectoryID: metadata.directoryID)
-                NCManageDatabase.sharedInstance.deleteLocalFile(predicate: NSPredicate(format: "fileID == %@", metadata.fileID))
-                NCManageDatabase.sharedInstance.deletePhotos(fileID: fileID)
+                NCManageDatabase.sharedInstance.deleteMetadata(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
+                NCManageDatabase.sharedInstance.deleteLocalFile(predicate: NSPredicate(format: "ocId == %@", metadata.ocId))
                 
-                NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: fileID, action: Int32(k_action_DEL))
+                NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_DEL))
             }
             
             if selector == selectorLoadViewImage {
@@ -1098,60 +1411,182 @@ class NCNetworkingMain: NSObject, CCNetworkingDelegate {
                 if appDelegate.activeDetail.view.window != nil {
                     appDelegate.activeDetail.downloadPhotoBrowserSuccessFailure(metadata, selector: selector, errorCode: errorCode)
                 }
-                if appDelegate.activeMedia.view.window != nil {
-                    appDelegate.activeMedia.downloadFileSuccessFailure(metadata.fileName, fileID: metadata.fileID, serverUrl: serverUrl, selector: selector, errorMessage: errorMessage, errorCode: errorCode)
-                }
                 
-                NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: fileID, action: Int32(k_action_MOD))
+                NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
             }
-        }       
+        }
+        
+        appDelegate.startLoadAutoDownloadUpload()
     }
     
     // UPLOAD
     
-    func uploadStart(_ fileID: String!, account: String!, task: URLSessionUploadTask!, serverUrl: String!) {
-        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: fileID, action: Int32(k_action_MOD))
+    func uploadStart(_ ocId: String!, account: String!, task: URLSessionUploadTask!, serverUrl: String!) {
+        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
         appDelegate.updateApplicationIconBadgeNumber()
     }
     
-    func uploadFileSuccessFailure(_ fileName: String!, fileID: String!, assetLocalIdentifier: String!, serverUrl: String!, selector: String!, errorMessage: String!, errorCode: Int) {
+    func uploadFileSuccessFailure(_ fileName: String!, ocId: String!, assetLocalIdentifier: String!, serverUrl: String!, selector: String!, errorMessage: String!, errorCode: Int) {
         
-        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, fileID: fileID, action: Int32(k_action_MOD))
+        guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "ocId == %@", ocId)) else {
+            return
+        }
+        
+        if metadata.account != appDelegate.activeAccount {
+            NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
+            return
+        }
+        
+        NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: serverUrl, ocId: ocId, action: Int32(k_action_MOD))
         
         if errorCode == 0 {
-            self.appDelegate.performSelector(onMainThread: #selector(self.appDelegate.loadAutoDownloadUpload), with: nil, waitUntilDone: true)
+            appDelegate.startLoadAutoDownloadUpload()
         } else {
-            NCManageDatabase.sharedInstance.addActivityClient(fileName, fileID: assetLocalIdentifier, action: k_activityDebugActionUpload, selector: selector, note: errorMessage, type: k_activityTypeFailure, verbose: false, activeUrl: appDelegate.activeUrl)
-            
             if errorCode != -999 && errorCode != kOCErrorServerUnauthorized && errorMessage != "" {
-                appDelegate.messageNotification("_upload_file_", description: errorMessage, visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.error, errorCode: errorCode)
+                NCContentPresenter.shared.messageNotification("_upload_file_", description: errorMessage, delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.error, errorCode: errorCode)
             }
         }
     }
     
-    @objc func downloadThumbnail(with metadata: tableMetadata, serverUrl: String, view: Any, indexPath: IndexPath, forceDownload: Bool) {
+    @objc func downloadThumbnail(with metadata: tableMetadata, view: Any, indexPath: IndexPath) {
+        operationQueueNetworkingMain.addOperation(NCOperationNetworkingMain.init(metadata: metadata, view: view, indexPath: indexPath, networkingFunc: "downloadThumbnail"))
+    }
+    
+    func downloadThumbnail(with metadata: tableMetadata, view: Any, indexPath: IndexPath, closure: @escaping () -> ()) {
         
-        if metadata.hasPreview == 1 && (!CCUtility.fileProviderStorageIconExists(metadata.fileID, fileNameView: metadata.fileName) || forceDownload) {
+        if !metadata.isInvalidated && metadata.hasPreview && (!CCUtility.fileProviderStorageIconExists(metadata.ocId, fileNameView: metadata.fileName) || metadata.typeFile == k_metadataTypeFile_document) {
+            
             let width = NCUtility.sharedInstance.getScreenWidthForPreview()
             let height = NCUtility.sharedInstance.getScreenHeightForPreview()
             
-            let ocNetworking = OCnetworking.init(delegate: self, metadataNet: nil, withUser: appDelegate.activeUser, withUserID: appDelegate.activeUserID, withPassword: appDelegate.activePassword, withUrl: appDelegate.activeUrl)
-            
-            ocNetworking?.downloadPreview(with: metadata, serverUrl: serverUrl, withWidth: width, andHeight: height, completion: { (message, errorCode) in
-                if errorCode == 0 && CCUtility.fileProviderStorageIconExists(metadata.fileID, fileNameView: metadata.fileName) {
+            OCNetworking.sharedManager().downloadPreview(withAccount: metadata.account, metadata: metadata, withWidth: width, andHeight: height, completion: { (account, image, message, errorCode) in
+                
+                if errorCode == 0 && account == self.appDelegate.activeAccount && !metadata.isInvalidated && CCUtility.fileProviderStorageIconExists(metadata.ocId, fileNameView: metadata.fileName) {
+                    
                     if view is UICollectionView && NCMainCommon.sharedInstance.isValidIndexPath(indexPath, view: view) {
-                        (view as! UICollectionView).reloadItems(at: [indexPath])
+                        if let cell = (view as! UICollectionView).cellForItem(at: indexPath) {
+                            if cell is NCListCell {
+                                (cell as! NCListCell).imageItem.image = image
+                            } else if cell is NCGridCell {
+                                (cell as! NCGridCell).imageItem.image = image
+                            } else if cell is NCGridMediaCell {
+                                (cell as! NCGridMediaCell).imageItem.image = image
+                            }
+                        }
                     }
-                    if view is UITableView && CCUtility.fileProviderStorageIconExists(metadata.fileID, fileNameView: metadata.fileName) && NCMainCommon.sharedInstance.isValidIndexPath(indexPath, view: view) {
-                        (view as! UITableView).reloadRows(at: [indexPath], with: UITableView.RowAnimation.none)
+                    
+                    if view is UITableView && CCUtility.fileProviderStorageIconExists(metadata.ocId, fileNameView: metadata.fileName) && NCMainCommon.sharedInstance.isValidIndexPath(indexPath, view: view) {
+                        if let cell = (view as! UITableView).cellForRow(at: indexPath) {
+                            if cell is CCCellMainTransfer {
+                                (cell as! CCCellMainTransfer).file.image = image
+                            } else if cell is CCCellMain {
+                                (cell as! CCCellMain).file.image = image
+                            }
+                        }
                     }
                 }
+                
+                return closure()
             })
+        }
+        
+        return closure()
+    }
+}
+
+//MARK: - Operation Networking Main
+
+class NCOperationNetworkingMain: Operation {
+    
+    private var _executing : Bool = false
+    override var isExecuting : Bool {
+        get { return _executing }
+        set {
+            guard _executing != newValue else { return }
+            willChangeValue(forKey: "isExecuting")
+            _executing = newValue
+            didChangeValue(forKey: "isExecuting")
+        }
+    }
+
+    private var _finished : Bool = false
+    override var isFinished : Bool {
+        get { return _finished }
+        set {
+            guard _finished != newValue else { return }
+            willChangeValue(forKey: "isFinished")
+            _finished = newValue
+            didChangeValue(forKey: "isFinished")
+        }
+    }
+    
+    private var metadata: tableMetadata?
+    private var view: Any?
+    private var indexPath: IndexPath?
+    private var networkingFunc: String = ""
+
+    init(metadata: tableMetadata?, view: Any?, indexPath: IndexPath?, networkingFunc: String) {
+        super.init()
+        
+        if metadata != nil { self.metadata = metadata! }
+        if view != nil { self.view = view! }
+        if indexPath != nil { self.indexPath = indexPath! }
+        
+        self.networkingFunc = networkingFunc
+    }
+    
+    override func start() {
+        if !Thread.isMainThread {
+            
+            self.performSelector(onMainThread:#selector(start), with: nil, waitUntilDone: false)
+            
+        } else {
+        
+            isExecuting = true
+        
+            if isCancelled {
+                finish()
+            } else {
+                poolNetworking()
+            }
+        }
+    }
+    
+    func finish() {
+        isExecuting = false
+        isFinished = true
+    }
+    
+    override func cancel() {
+        super.cancel()
+        
+        if isExecuting {
+            complete()
+        }
+    }
+    
+    func complete() {
+        finish()
+        
+        UIApplication.shared.isNetworkActivityIndicatorVisible = false
+    }
+    
+    func poolNetworking() {
+        UIApplication.shared.isNetworkActivityIndicatorVisible = true
+        
+        switch networkingFunc {
+        case "downloadThumbnail":
+            NCNetworkingMain.sharedInstance.downloadThumbnail(with: metadata!, view: view!, indexPath: indexPath!) {
+                self.complete()
+            }
+        default:
+            print("error")
         }
     }
 }
 
-//MARK: -
+
+//MARK: - Function Main
 
 class NCFunctionMain: NSObject {
     
@@ -1167,23 +1602,19 @@ class NCFunctionMain: NSObject {
         let directories = NCManageDatabase.sharedInstance.getTablesDirectory(predicate: NSPredicate(format: "account == %@ AND offline == true", appDelegate.activeAccount), sorted: "serverUrl", ascending: true)
         if (directories != nil) {
             for directory: tableDirectory in directories! {
-                CCSynchronize.shared()?.readFolder(directory.serverUrl, selector: selectorReadFolderWithDownload)
+                CCSynchronize.shared()?.readFolder(directory.serverUrl, selector: selectorReadFolderWithDownload, account: appDelegate.activeAccount)
             }
         }
         
         let files = NCManageDatabase.sharedInstance.getTableLocalFiles(predicate: NSPredicate(format: "account == %@ AND offline == true", appDelegate.activeAccount), sorted: "fileName", ascending: true)
         if (files != nil) {
             for file: tableLocalFile in files! {
-                guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "fileID == %@", file.fileID)) else {
+                guard let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "ocId == %@", file.ocId)) else {
                     continue
                 }
-                guard let serverUrl = NCManageDatabase.sharedInstance.getServerUrl(metadata.directoryID) else {
-                    continue
-                }
-                CCSynchronize.shared()?.readFile(metadata.fileID, fileName: metadata.fileName, serverUrl: serverUrl, selector: selectorReadFileWithDownload)
+                CCSynchronize.shared()?.readFile(metadata.ocId, fileName: metadata.fileName, serverUrl: metadata.serverUrl, selector: selectorReadFileWithDownload, account: appDelegate.activeAccount)
             }
         }
-    
     }
 }
 

@@ -1,6 +1,6 @@
 //
 //  CCDetail.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 16/01/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -26,17 +26,23 @@
 #import <WebKit/WebKit.h>
 
 #import "UIImage+animatedGIF.h"
-#import "TWMessageBarManager.h"
 #import "MWPhotoBrowser.h"
 #import "ReaderViewController.h"
 #import "CCGraphics.h"
 
 @class tableMetadata;
+@class NCViewerImagemeter;
+@class NCViewerRichdocument;
+@class NCViewerNextcloudText;
 
 @interface CCDetail : UIViewController <MWPhotoBrowserDelegate, ReaderViewControllerDelegate>
 
 @property (nonatomic, strong) tableMetadata *metadataDetail;
+@property (nonatomic, strong) NSString *selectorDetail;
+
 @property (nonatomic, strong) NSDate *dateFilterQuery;
+
+- (void)viewFile;
 
 // Toolbar
 @property (nonatomic, strong) UIToolbar *toolbar;
@@ -56,6 +62,15 @@
 // PDF
 @property (nonatomic, strong) ReaderViewController *readerPDFViewController;
 @property (nonatomic, strong) NSString *passwordPDF;
+
+// RichDocument
+@property (nonatomic, strong) NCViewerRichdocument *richDocument;
+
+// NextcloudText
+@property (nonatomic, strong) NCViewerNextcloudText *nextcloudText;
+
+// IM
+@property (nonatomic, strong) NCViewerImagemeter *imagemeter;
 
 @property(nonatomic, weak) IBOutlet UIImageView *imageBackground;
 

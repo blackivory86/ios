@@ -41,7 +41,8 @@
 #define k_domain_error_code @"com.owncloud"
 
 //Url to access to Shared API to create
-#define k_url_acces_shared_api @"ocs/v1.php/apps/files_sharing/api/v1/shares"
+//#define k_url_acces_shared_api @"ocs/v1.php/apps/files_sharing/api/v1/shares"
+#define k_url_acces_shared_api @"ocs/v2.php/apps/files_sharing/api/v1/shares"
 
 //Url to access to Remote Shared API
 #define k_url_acces_remote_shared_api @"ocs/v1.php/apps/files_sharing/api/v1/remote_shares"
@@ -59,7 +60,7 @@
 #define k_url_acces_remote_subscribing_nextcloud_server_api @"/ocs/v2.php/apps/notifications/api/v2/push"
 
 //Url to access to Remote Activity API
-#define k_url_acces_remote_activity_api @"ocs/v2.php/cloud/activity"
+#define k_url_acces_remote_activity_api @"ocs/v2.php/apps/activity/api/v2/activity"
 
 //Url to access to External sites API
 #define k_url_acces_external_sites_api @"ocs/v2.php/apps/external/api/v1"
@@ -80,7 +81,13 @@
 #define k_url_create_new_mobile_richdocuments @"ocs/v2.php/apps/richdocuments/api/v1/templates/new"
 
 //Url to insert files directly from your Nextcloud to a richdocuments
-#define k_url_insert_assets_to_richdocuments @"apps/richdocuments/assets"
+#define k_url_insert_assets_to_richdocuments @"index.php/apps/richdocuments/assets"
+
+//Url for fulltextsearch
+#define k_url_fulltextsearch @"index.php/apps/fulltextsearch/v1/remote"
+
+//Url for remote wipe
+#define k_url_get_wipe @"index.php/core/wipe"
 
 //Version of the server that have share API
 #define k_version_support_shared [NSArray arrayWithObjects:  @"5", @"0", @"27", nil]

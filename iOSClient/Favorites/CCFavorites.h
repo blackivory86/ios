@@ -1,6 +1,6 @@
 //
 //  CCFavorites.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 16/01/17.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -25,7 +25,6 @@
 #import <DZNEmptyDataSet/UIScrollView+EmptyDataSet.h>
 
 #import "CCDetail.h"
-#import "TWMessageBarManager.h"
 #import "AHKActionSheet.h"
 #import "CCCellMain.h"
 #import "CCCellMainTransfer.h"
@@ -35,21 +34,20 @@
 
 @class tableMetadata;
 
-@interface CCFavorites : UIViewController <UITableViewDataSource, UITableViewDelegate, UIDocumentInteractionControllerDelegate, UIActionSheetDelegate, DZNEmptyDataSetSource, DZNEmptyDataSetDelegate, MGSwipeTableCellDelegate>
+@interface CCFavorites : UIViewController <UITableViewDataSource, UITableViewDelegate, UIActionSheetDelegate, DZNEmptyDataSetSource, DZNEmptyDataSetDelegate, MGSwipeTableCellDelegate, UIViewControllerPreviewingDelegate>
 
 @property (nonatomic, weak) IBOutlet UITableView *tableView;
 
 @property (nonatomic, strong) tableMetadata *metadata;
 @property (nonatomic, strong) tableMetadata *metadataForPushDetail;
+@property (nonatomic, strong) NSString *selectorForPushDetail;
 @property (nonatomic, strong) NSString *serverUrl;
 @property (nonatomic, strong) NSString *titleViewControl;
 
 @property (nonatomic, weak) CCDetail *detailViewController;
 
-- (void)shouldPerformSegue:(tableMetadata *)metadata;
-- (void)openIn:(tableMetadata *)metadata;
-- (void)reloadDatasource:(NSString *)fileID action:(NSInteger)action;
+- (void)shouldPerformSegue:(tableMetadata *)metadata selector:(NSString *)selector;
+- (void)reloadDatasource:(NSString *)ocId action:(NSInteger)action;
 - (void)listingFavorites;
-- (void)addFavoriteFolder:(NSString *)serverUrl;
 
 @end

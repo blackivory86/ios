@@ -45,15 +45,33 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
         self.fileName = fileName
         self.serverUrl = serverUrl
         self.text = text
-        
-        initializeForm()
     }
     
-    //MARK: XLFormDescriptorDelegate
+    // MARK: - View Life Cycle
+    
+    override func viewDidLoad() {
+        
+        super.viewDidLoad()
+        
+        let saveButton : UIBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
+        self.navigationItem.rightBarButtonItem = saveButton
+        self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
+        
+        // Theming view
+        NotificationCenter.default.addObserver(self, selector: #selector(self.changeTheming), name: NSNotification.Name(rawValue: "changeTheming"), object: nil)
+        changeTheming()
+    }
+    
+    @objc func changeTheming() {
+           appDelegate.changeTheming(self, tableView: tableView, collectionView: nil, form: true)
+           initializeForm()
+    }
+    
+    //MARK: XLForm
     
     func initializeForm() {
         
-        let form : XLFormDescriptor = XLFormDescriptor() as XLFormDescriptor
+        let form : XLFormDescriptor = XLFormDescriptor(title: NSLocalizedString("_text_upload_title_", comment: "")) as XLFormDescriptor
         form.rowNavigationOptions = XLFormRowNavigationOptions.stopDisableRow
         
         var section : XLFormSectionDescriptor
@@ -66,13 +84,14 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
         
         row = XLFormRowDescriptor(tag: "ButtonDestinationFolder", rowType: XLFormRowDescriptorTypeButton, title: self.titleServerUrl)
         row.action.formSelector = #selector(changeDestinationFolder(_:))
-        
-        let imageFolder = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, multiplier:1, color: NCBrandColor.sharedInstance.brandElement) as UIImage
-        row.cellConfig["imageView.image"] = imageFolder
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
+        row.cellConfig["imageView.image"] = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, width: 50, height: 50, color: NCBrandColor.sharedInstance.brandElement) as UIImage
         
         row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+
         section.addFormRow(row)
         
         // Section: File Name
@@ -80,15 +99,17 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
         section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_filename_", comment: ""))
         form.addFormSection(section)
         
-        
         row = XLFormRowDescriptor(tag: "fileName", rowType: XLFormRowDescriptorTypeAccount, title: NSLocalizedString("_filename_", comment: ""))
         row.value = self.fileName
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+
         row.cellConfig["textField.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textField.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textField.textColor"] = NCBrandColor.sharedInstance.textView
+
         section.addFormRow(row)
         
         self.form = form
@@ -115,21 +136,14 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
         }
     }
     
-    // MARK: - View Life Cycle
-    
-    override func viewDidLoad() {
+    override func textFieldDidBeginEditing(_ textField: UITextField) {
         
-        super.viewDidLoad()
+        let cell = textField.formDescriptorCell()
+        let tag = cell?.rowDescriptor.tag
         
-        let saveButton : UIBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
-        self.navigationItem.rightBarButtonItem = saveButton
-        
-        self.navigationController?.navigationBar.isTranslucent = false
-        self.navigationController?.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand
-        self.navigationController?.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText
-        self.navigationController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: NCBrandColor.sharedInstance.brandText]
-        
-        self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
+        if tag == "fileName" {
+            CCUtility.selectFileName(from: textField)
+        }
     }
     
     // MARK: - Action
@@ -170,11 +184,7 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
             fileNameSave = (name as! NSString).deletingPathExtension + ".txt"
         }
         
-        guard let directoryID = NCManageDatabase.sharedInstance.getDirectoryID(self.serverUrl) else {
-            return
-        }
-        let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "directoryID == %@ AND fileNameView == %@", directoryID, fileNameSave))
-        
+        let metadata = NCManageDatabase.sharedInstance.getMetadata(predicate: NSPredicate(format: "account == %@ AND serverUrl == %@ AND fileNameView == %@", appDelegate.activeAccount, self.serverUrl, fileNameSave))
         if (metadata != nil) {
             
             let alertController = UIAlertController(title: fileNameSave, message: NSLocalizedString("_file_already_exists_", comment: ""), preferredStyle: .alert)
@@ -183,7 +193,7 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
             }
             
             let overwriteAction = UIAlertAction(title: NSLocalizedString("_overwrite_", comment: ""), style: .cancel) { (action:UIAlertAction) in
-                self.dismissAndUpload(fileNameSave, fileID: metadata!.fileID, directoryID: directoryID)
+                self.dismissAndUpload(fileNameSave, ocId: metadata!.ocId, serverUrl: self.serverUrl)
             }
             
             alertController.addAction(cancelAction)
@@ -192,40 +202,51 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
             self.present(alertController, animated: true, completion:nil)
             
         } else {
-            let directoryID = NCManageDatabase.sharedInstance.getDirectoryID(self.serverUrl)!
-            dismissAndUpload(fileNameSave, fileID: directoryID + fileNameSave, directoryID: directoryID)
+            let ocId = CCUtility.createMetadataID(fromAccount: appDelegate.activeAccount, serverUrl: self.serverUrl, fileNameView: fileNameSave, directory: false)!
+            dismissAndUpload(fileNameSave, ocId: ocId, serverUrl: serverUrl)
         }
     }
     
-    func dismissAndUpload(_ fileNameSave: String, fileID: String, directoryID: String) {
+    func dismissAndUpload(_ fileNameSave: String, ocId: String, serverUrl: String) {
         
         self.dismiss(animated: true, completion: {
             
             let data = self.text.data(using: .utf8)
-            let success = FileManager.default.createFile(atPath: CCUtility.getDirectoryProviderStorageFileID(fileID, fileNameView: fileNameSave), contents: data, attributes: nil)
+            let success = FileManager.default.createFile(atPath: CCUtility.getDirectoryProviderStorageOcId(ocId, fileNameView: fileNameSave), contents: data, attributes: nil)
             
             if success {
+                
+                /* TEST
+                let serverUrlFileName = serverUrl + "/" + fileNameSave
+                let fileNameLocalPath = CCUtility.getDirectoryProviderStorageOcId(ocId, fileNameView: fileNameSave)!
+                
+                _ = NCCommunication.sharedInstance.upload(serverUrlFileName: serverUrlFileName, fileNameLocalPath: fileNameLocalPath, dateCreationFile: nil, dateModificationFile: nil, account: self.appDelegate.activeAccount, progressHandler: { (progress) in
+                    //
+                }, completionHandler: { (account, etag, ocId, date, errorCode, errorDescription) in
+                    print(")")
+                })
+                */
                 
                 let metadataForUpload = tableMetadata()
                 
                 metadataForUpload.account = self.appDelegate.activeAccount
                 metadataForUpload.date = NSDate()
-                metadataForUpload.directoryID = directoryID
-                metadataForUpload.fileID = fileID
+                metadataForUpload.ocId = ocId
                 metadataForUpload.fileName = fileNameSave
                 metadataForUpload.fileNameView = fileNameSave
+                metadataForUpload.serverUrl = serverUrl
                 metadataForUpload.session = k_upload_session
                 metadataForUpload.sessionSelector = selectorUploadFile
                 metadataForUpload.status = Int(k_metadataStatusWaitUpload)
                 
                 _ = NCManageDatabase.sharedInstance.addMetadata(metadataForUpload)
-                self.appDelegate.perform(#selector(self.appDelegate.loadAutoDownloadUpload), on: Thread.main, with: nil, waitUntilDone: true)
-                
-                NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: self.serverUrl, fileID: nil, action: Int32(k_action_NULL))
-                
+                NCMainCommon.sharedInstance.reloadDatasource(ServerUrl: self.serverUrl, ocId: nil, action: Int32(k_action_NULL))
+
+                self.appDelegate.startLoadAutoDownloadUpload()
+            
             } else {
                 
-                self.appDelegate.messageNotification("_error_", description: "_error_creation_file_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+                NCContentPresenter.shared.messageNotification("_error_", description: "_error_creation_file_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.info, errorCode: 0)
             }
         })
     }
@@ -252,7 +273,7 @@ class NCCreateFormUploadFileText: XLFormViewController, NCSelectDelegate {
         viewController.titleButtonDone = NSLocalizedString("_select_", comment: "")
         viewController.type = ""
         
-        navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
+        navigationController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
         self.present(navigationController, animated: true, completion: nil)
     }
 }

@@ -1,6 +1,6 @@
 //
 //  CCSplit.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 09/10/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -25,13 +25,10 @@
 
 #import "CCLogin.h"
 #import "CCDetail.h"
-#import "CCIntro.h"
 
-@interface CCSplit : UISplitViewController <UISplitViewControllerDelegate, CCIntroDelegate>
+@interface CCSplit : UISplitViewController <UISplitViewControllerDelegate>
 
 @property (nonatomic, strong) NSString *version;
 @property (nonatomic, strong) NSString *build;
-
-@property (nonatomic, strong) CCIntro *intro;
 
 @end

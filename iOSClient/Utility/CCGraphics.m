@@ -1,6 +1,6 @@
 //
 //  CCGraphics.m
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 04/02/16.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -53,9 +53,7 @@
 
 // mix two image
 + (UIImage *)overlayImage:(UIImage *)backgroundImage watermarkImage:(UIImage *)watermarkImage where:(NSString *)where
-{
-    // example watermarkImage = [UIImage imageNamed:@"lock"];
-    
+{    
     UIGraphicsBeginImageContext(backgroundImage.size);
     [backgroundImage drawInRect:CGRectMake(0, 0, backgroundImage.size.width, backgroundImage.size.height)];
     
@@ -85,33 +83,6 @@
     CGImageRelease(cgImage);
     
     return image;
-}
-
-+ (UIImage *)scaleImage:(UIImage *)image toSize:(CGSize)targetSize
-{
-    //If scaleFactor is not touched, no scaling will occur
-    CGFloat scaleFactor = 1.0;
-    
-    //Deciding which factor to use to scale the image (factor = targetSize / imageSize)
-    if (image.size.width > targetSize.width || image.size.height > targetSize.height)
-        if (!((scaleFactor = (targetSize.width / image.size.width)) > (targetSize.height / image.size.height))) //scale to fit width, or
-            scaleFactor = targetSize.height / image.size.height; // scale to fit heigth.
-    
-    UIGraphicsBeginImageContext(targetSize);
-    
-    //Creating the rect where the scaled image is drawn in
-    CGRect rect = CGRectMake((targetSize.width - image.size.width * scaleFactor) / 2,
-                             (targetSize.height -  image.size.height * scaleFactor) / 2,
-                             image.size.width * scaleFactor, image.size.height * scaleFactor);
-    
-    //Draw the image into the rect
-    [image drawInRect:rect];
-    
-    //Saving the image, ending image context
-    UIImage *scaledImage = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    
-    return scaledImage;
 }
 
 + (UIImage *)scaleImage:(UIImage *)image toSize:(CGSize)targetSize isAspectRation:(BOOL)aspect
@@ -144,13 +115,13 @@
     return newImage;
 }
 
-+ (UIImage *)createNewImageFrom:(NSString *)fileName fileID:(NSString *)fileID extension:(NSString *)extension filterGrayScale:(BOOL)filterGrayScale typeFile:(NSString *)typeFile writeImage:(BOOL)writeImage
++ (UIImage *)createNewImageFrom:(NSString *)fileName ocId:(NSString *)ocId extension:(NSString *)extension filterGrayScale:(BOOL)filterGrayScale typeFile:(NSString *)typeFile writeImage:(BOOL)writeImage
 {
     UIImage *originalImage;
     UIImage *scaleImage;
-    NSString *fileNamePath = [CCUtility getDirectoryProviderStorageFileID:fileID fileNameView:fileName];
+    NSString *fileNamePath = [CCUtility getDirectoryProviderStorageOcId:ocId fileNameView:fileName];
     
-    if (![CCUtility fileProviderStorageExists:fileID fileNameView:fileName]) return nil;
+    if (![CCUtility fileProviderStorageExists:ocId fileNameView:fileName]) return nil;
     
     // only viedo / image
     if (![typeFile isEqualToString: k_metadataTypeFile_image] && ![typeFile isEqualToString: k_metadataTypeFile_video]) return nil;
@@ -172,7 +143,7 @@
     CGFloat width = [[NCUtility sharedInstance] getScreenWidthForPreview];
     CGFloat height = [[NCUtility sharedInstance] getScreenHeightForPreview];
     
-    scaleImage = [self scaleImage:originalImage toSize:CGSizeMake(width, height)];
+    scaleImage = [self scaleImage:originalImage toSize:CGSizeMake(width, height) isAspectRation:YES];
     scaleImage = [UIImage imageWithData:UIImageJPEGRepresentation(scaleImage, 0.5f)];
     
     // it is request write photo  ?
@@ -182,11 +153,11 @@
             
             // if it is preview for Upload then trasform it in gray scale
             scaleImage = [self grayscale:scaleImage];
-            [UIImagePNGRepresentation(scaleImage) writeToFile:[CCUtility getDirectoryProviderStorageIconFileID:fileID fileNameView:fileName] atomically: YES];
+            [UIImagePNGRepresentation(scaleImage) writeToFile:[CCUtility getDirectoryProviderStorageIconOcId:ocId fileNameView:fileName] atomically: YES];
             
         } else {
             
-            [UIImagePNGRepresentation(scaleImage) writeToFile:[CCUtility getDirectoryProviderStorageIconFileID:fileID fileNameView:fileName] atomically: YES];
+            [UIImagePNGRepresentation(scaleImage) writeToFile:[CCUtility getDirectoryProviderStorageIconOcId:ocId fileNameView:fileName] atomically: YES];
         }
     }
     
@@ -216,7 +187,7 @@
     return [UIImage imageWithCGImage:img.CGImage scale:2.0 orientation: UIImageOrientationDownMirrored];
 }
 
-+ (UIImage *)changeThemingColorImage:(UIImage *)image width:(CGFloat)width height:(CGFloat)height scale:(CGFloat)scale color:(UIColor *)color
++ (UIImage *)changeThemingColorImage:(UIImage *)image width:(CGFloat)width height:(CGFloat)height color:(UIColor *)color
 {
     CGRect rect = CGRectMake(0, 0, width, height);
     UIGraphicsBeginImageContext(rect.size);
@@ -228,7 +199,7 @@
     UIImage *img = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     
-    return [UIImage imageWithCGImage:img.CGImage scale:scale orientation: UIImageOrientationDownMirrored];
+    return [UIImage imageWithCGImage:img.CGImage scale:2 orientation: UIImageOrientationDownMirrored];
 }
 
 + (UIImage*)drawText:(NSString*)text inImage:(UIImage*)image colorText:(UIColor *)colorText sizeOfFont:(CGFloat)sizeOfFont
@@ -400,14 +371,14 @@ Color difference is determined by the following formula:
     if (themingColor.length == 7) {
         newColor = [CCGraphics colorFromHexString:themingColor];
     } else {
-        newColor = [NCBrandColor sharedInstance].customer;
+        newColor = NCBrandColor.sharedInstance.customer;
     }
             
     // COLOR TEXT
     if (themingColorText.length == 7) {
         newColorText = [CCGraphics colorFromHexString:themingColorText];
     } else {
-        newColorText = [NCBrandColor sharedInstance].customerText;
+        newColorText = NCBrandColor.sharedInstance.customerText;
     }
             
     // COLOR ELEMENT
@@ -420,10 +391,9 @@ Color difference is determined by the following formula:
             newColorElement = newColor;
     }
             
-    
-    [NCBrandColor sharedInstance].brand = newColor;
-    [NCBrandColor sharedInstance].brandElement = newColorElement;
-    [NCBrandColor sharedInstance].brandText = newColorText;
+    NCBrandColor.sharedInstance.brand = newColor;
+    NCBrandColor.sharedInstance.brandElement = newColorElement;
+    NCBrandColor.sharedInstance.brandText = newColorText;
 }
 
 @end

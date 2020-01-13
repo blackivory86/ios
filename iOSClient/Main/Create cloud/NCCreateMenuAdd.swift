@@ -27,109 +27,125 @@ import Sheeeeeeeeet
 class NCCreateMenuAdd: NSObject {
     
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
+    var isNextcloudTextAvailable = false
     
-    let fontButton = [NSAttributedString.Key.font:UIFont(name: "HelveticaNeue", size: 16)!, NSAttributedString.Key.foregroundColor: UIColor.black]
-    let fontEncrypted = [NSAttributedString.Key.font:UIFont(name: "HelveticaNeue", size: 16)!, NSAttributedString.Key.foregroundColor: NCBrandColor.sharedInstance.encrypted as UIColor]
-    let fontCancel = [NSAttributedString.Key.font:UIFont(name: "HelveticaNeue-Bold", size: 17)!, NSAttributedString.Key.foregroundColor: UIColor.black]
-    let fontDisable = [NSAttributedString.Key.font:UIFont(name: "HelveticaNeue", size: 16)!, NSAttributedString.Key.foregroundColor: UIColor.darkGray]
-    
-    var colorIcon = NCBrandColor.sharedInstance.brandElement
-    
-    @objc init (themingColor : UIColor) {
-        
+    @objc init(viewController: UIViewController, view : UIView) {
         super.init()
-        colorIcon = themingColor
-    }
-    
-    @objc func createMenu(viewController: UIViewController, view : UIView) {
+
+        if self.appDelegate.reachability.isReachable() && NCBrandBeta.shared.directEditing && NCManageDatabase.sharedInstance.getDirectEditingCreators(account: self.appDelegate.activeAccount) != nil {
+            isNextcloudTextAvailable = true
+        }
         
-        var items = [ActionSheetItem]()
+        var items = [MenuItem]()
+
+        ActionSheetTableView.appearance().backgroundColor = NCBrandColor.sharedInstance.backgroundForm
+        ActionSheetTableView.appearance().separatorColor = NCBrandColor.sharedInstance.separator
+        ActionSheetItemCell.appearance().backgroundColor = NCBrandColor.sharedInstance.backgroundForm
+        ActionSheetItemCell.appearance().titleColor = NCBrandColor.sharedInstance.textView
         
-        items.append(ActionSheetItem(title: NSLocalizedString("_upload_photos_videos_", comment: ""), value: 1, image: CCGraphics.changeThemingColorImage(UIImage(named: "media"), multiplier:1, color: NCBrandColor.sharedInstance.icon)))
+        items.append(MenuItem(title: NSLocalizedString("_upload_photos_videos_", comment: ""), value: 10, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "file_photo"), width: 50, height: 50, color: NCBrandColor.sharedInstance.icon)))
         
-        items.append(ActionSheetItem(title: NSLocalizedString("_upload_file_", comment: ""), value: 2, image: CCGraphics.changeThemingColorImage(UIImage(named: "file"), multiplier:1, color: NCBrandColor.sharedInstance.icon)))
+        items.append(MenuItem(title: NSLocalizedString("_upload_file_", comment: ""), value: 20, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "file"), width: 50, height: 50, color: NCBrandColor.sharedInstance.icon)))
         
-        items.append(ActionSheetItem(title: NSLocalizedString("_upload_file_text_", comment: ""), value: 3, image: CCGraphics.changeThemingColorImage(UIImage(named: "file_txt"), multiplier:1, color: NCBrandColor.sharedInstance.icon)))
+        if NCBrandOptions.sharedInstance.use_imi_viewer {
+            items.append(MenuItem(title: NSLocalizedString("_im_create_new_file", tableName: "IMLocalizable", bundle: Bundle.main, value: "", comment: ""), value: 21, image: CCGraphics.scale(UIImage.init(named: "imagemeter"), to: CGSize(width: 25, height: 25), isAspectRation: true)))
+        }
+        
+        if isNextcloudTextAvailable {
+            items.append(MenuItem(title: NSLocalizedString("_create_nextcloudtext_document_", comment: ""), value: 31, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "file_txt"), width: 50, height: 50, color: NCBrandColor.sharedInstance.icon)))
+        } else {
+            items.append(MenuItem(title: NSLocalizedString("_upload_file_text_", comment: ""), value: 30, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "file_txt"), width: 50, height: 50, color: NCBrandColor.sharedInstance.icon)))
+        }
         
 #if !targetEnvironment(simulator)
         if #available(iOS 11.0, *) {
-            items.append(ActionSheetItem(title: NSLocalizedString("_scans_document_", comment: ""), value: 4, image: CCGraphics.changeThemingColorImage(UIImage(named: "scan"), multiplier:2, color: NCBrandColor.sharedInstance.icon)))
+            items.append(MenuItem(title: NSLocalizedString("_scans_document_", comment: ""), value: 40, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "scan"), width: 50, height: 50, color: NCBrandColor.sharedInstance.icon)))
         }
 #endif
         
-        items.append(ActionSheetItem(title: NSLocalizedString("_create_folder_", comment: ""), value: 5, image: CCGraphics.changeThemingColorImage(UIImage(named: "folder"), multiplier:1, color: colorIcon)))
+        items.append(MenuItem(title: NSLocalizedString("_create_voice_memo_", comment: ""), value: 50, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "microphone"), width: 50, height: 50, color: NCBrandColor.sharedInstance.icon)))
+
+        items.append(MenuItem(title: NSLocalizedString("_create_folder_", comment: ""), value: 60, image: CCGraphics.changeThemingColorImage(UIImage.init(named: "folder"), width: 50, height: 50, color: NCBrandColor.sharedInstance.brandElement)))
         
-        // items.append(ActionSheetSectionTitle(title: "Cheap"))
-        // items.append(ActionSheetSectionMargin())
-        
-        /*
-         let appearanceSectionMargin = ActionSheetAppearance.standard
-         //appearanceSectionMargin. = 10
-         appearanceSectionMargin.backgroundColor = UIColor.red
-         let itemSectionMargin = ActionSheetSectionTitle(title: "Cheap")
-         itemSectionMargin.customAppearance = appearanceSectionMargin
-         items.append(itemSectionMargin)
-         */
-        
-        if let richdocumentsMimetypes = NCManageDatabase.sharedInstance.getRichdocumentsMimetypes() {
+        if let richdocumentsMimetypes = NCManageDatabase.sharedInstance.getRichdocumentsMimetypes(account: appDelegate.activeAccount) {
             if richdocumentsMimetypes.count > 0 {
-                items.append(ActionSheetItem(title: NSLocalizedString("_create_new_document_", comment: ""), value: 6, image: UIImage.init(named: "document_menu")))
-                items.append(ActionSheetItem(title: NSLocalizedString("_create_new_spreadsheet_", comment: ""), value: 7, image: UIImage(named: "file_xls_menu")))
-                items.append(ActionSheetItem(title: NSLocalizedString("_create_new_presentation_", comment: ""), value: 8, image: UIImage(named: "file_ppt_menu")))
+                items.append(MenuItem(title: NSLocalizedString("_create_new_document_", comment: ""), value: 70, image: UIImage.init(named: "create_file_document")))
+                items.append(MenuItem(title: NSLocalizedString("_create_new_spreadsheet_", comment: ""), value: 80, image: UIImage(named: "create_file_xls")))
+                items.append(MenuItem(title: NSLocalizedString("_create_new_presentation_", comment: ""), value: 90, image: UIImage(named: "create_file_ppt")))
             }
         }
         
-        items.append(ActionSheetCancelButton(title: NSLocalizedString("_cancel_", comment: "")))
+        items.append(CancelButton(title: NSLocalizedString("_cancel_", comment: "")))
         
-        let actionSheet = ActionSheet(items: items) { sheet, item in
-            if item.value as? Int == 1 { self.appDelegate.activeMain.openAssetsPickerController() }
-            if item.value as? Int == 2 { self.appDelegate.activeMain.openImportDocumentPicker() }
-            if item.value as? Int == 3 {
+        let actionSheet = ActionSheet(menu: Menu(items: items), action: { (shhet, item) in
+
+            if item.value as? Int == 10 { self.appDelegate.activeMain.openAssetsPickerController() }
+            if item.value as? Int == 20 { self.appDelegate.activeMain.openImportDocumentPicker() }
+            if item.value as? Int == 21 {
+                _ = IMCreate.init(serverUrl: self.appDelegate.activeMain.serverUrl)
+            }
+            if item.value as? Int == 30 {
                 let storyboard = UIStoryboard(name: "NCText", bundle: nil)
                 let controller = storyboard.instantiateViewController(withIdentifier: "NCText")
                 controller.modalPresentationStyle = UIModalPresentationStyle.pageSheet
                 self.appDelegate.activeMain.present(controller, animated: true, completion: nil)
             }
-            if item.value as? Int == 4 {
-                if #available(iOS 11.0, *) {
-                    NCCreateScanDocument.sharedInstance.openScannerDocument(viewController: self.appDelegate.activeMain, openScan: true)
-                }
-            }
-            if item.value as? Int == 5 { self.appDelegate.activeMain.createFolder() }
-            
-            if item.value as? Int == 6 {
-                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadRichdocuments", bundle: nil).instantiateInitialViewController() else {
+            if item.value as? Int == 31 {
+                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadDocuments", bundle: nil).instantiateInitialViewController() else {
                     return
                 }
                 navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
                 
-                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadRichdocuments
+                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadDocuments
+                viewController.typeTemplate = k_nextcloudtext_document
+                viewController.serverUrl = self.appDelegate.activeMain.serverUrl
+                viewController.titleForm = NSLocalizedString("_create_nextcloudtext_document_", comment: "")
+                
+                self.appDelegate.window.rootViewController?.present(navigationController, animated: true, completion: nil)
+            }
+            if item.value as? Int == 40 {
+                if #available(iOS 11.0, *) {
+                    NCCreateScanDocument.sharedInstance.openScannerDocument(viewController: self.appDelegate.activeMain)
+                }
+            }
+            
+            if item.value as? Int == 50 { NCMainCommon.sharedInstance.startAudioRecorder() }
+            
+            if item.value as? Int == 60 { self.appDelegate.activeMain.createFolder() }
+            
+            if item.value as? Int == 70 {
+                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadDocuments", bundle: nil).instantiateInitialViewController() else {
+                    return
+                }
+                navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
+                
+                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadDocuments
                 viewController.typeTemplate = k_richdocument_document
                 viewController.serverUrl = self.appDelegate.activeMain.serverUrl
                 viewController.titleForm = NSLocalizedString("_create_new_document_", comment: "")
                 
                 self.appDelegate.window.rootViewController?.present(navigationController, animated: true, completion: nil)
             }
-            if item.value as? Int == 7 {
-                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadRichdocuments", bundle: nil).instantiateInitialViewController() else {
+            if item.value as? Int == 80 {
+                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadDocuments", bundle: nil).instantiateInitialViewController() else {
                     return
                 }
                 navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
                 
-                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadRichdocuments
+                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadDocuments
                 viewController.typeTemplate = k_richdocument_spreadsheet
                 viewController.serverUrl = self.appDelegate.activeMain.serverUrl
                 viewController.titleForm = NSLocalizedString("_create_new_spreadsheet_", comment: "")
                 
                 self.appDelegate.window.rootViewController?.present(navigationController, animated: true, completion: nil)
             }
-            if item.value as? Int == 8 {
-                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadRichdocuments", bundle: nil).instantiateInitialViewController() else {
+            if item.value as? Int == 90 {
+                guard let navigationController = UIStoryboard(name: "NCCreateFormUploadDocuments", bundle: nil).instantiateInitialViewController() else {
                     return
                 }
                 navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
                 
-                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadRichdocuments
+                let viewController = (navigationController as! UINavigationController).topViewController as! NCCreateFormUploadDocuments
                 viewController.typeTemplate = k_richdocument_presentation
                 viewController.serverUrl = self.appDelegate.activeMain.serverUrl
                 viewController.titleForm = NSLocalizedString("_create_new_presentation_", comment: "")
@@ -137,9 +153,10 @@ class NCCreateMenuAdd: NSObject {
                 self.appDelegate.window.rootViewController?.present(navigationController, animated: true, completion: nil)
             }
             
-            if item is ActionSheetCancelButton { print("Cancel buttons has the value `true`") }
-        }
-        
+            if item is CancelButton { print("Cancel buttons has the value `true`") }
+        })
+                
         actionSheet.present(in: viewController, from: view)
+        
     }
 }

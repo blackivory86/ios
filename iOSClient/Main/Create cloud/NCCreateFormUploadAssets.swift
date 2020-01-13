@@ -28,15 +28,17 @@ import Foundation
     func dismissFormUploadAssets()
 }
 
-class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
+class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate, PhotoEditorDelegate {
     
-    var serverUrl : String = ""
-    var titleServerUrl : String?
-    var assets: NSMutableArray = []
-    var cryptated : Bool = false
-    var session : String = ""
+    var serverUrl: String = ""
+    var titleServerUrl: String?
+    var assets = NSMutableArray()
+    var cryptated: Bool = false
+    var session: String = ""
     weak var delegate: createFormUploadAssetsDelegate?
-    
+    let requestOptions = PHImageRequestOptions()
+    var imagePreview: UIImage?
+    let targetSizeImagePreview = CGSize(width:100, height: 100)
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
     
     @objc convenience init(serverUrl : String, assets : NSMutableArray, cryptated : Bool, session : String, delegate: createFormUploadAssetsDelegate) {
@@ -55,10 +57,47 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         self.session = session
         self.delegate = delegate
         
-        self.initializeForm()
+        requestOptions.resizeMode = PHImageRequestOptionsResizeMode.exact
+        requestOptions.deliveryMode = PHImageRequestOptionsDeliveryMode.highQualityFormat
+        requestOptions.isSynchronous = true
     }
     
-    //MARK: XLFormDescriptorDelegate
+    // MARK: - View Life Cycle
+    
+    override func viewDidLoad() {
+        
+        super.viewDidLoad()
+        
+        self.navigationItem.leftBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_cancel_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(cancel))
+        self.navigationItem.rightBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
+        
+        self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
+        
+        if assets.count == 1 && (assets[0] as! PHAsset).mediaType == PHAssetMediaType.image {
+            PHImageManager.default().requestImage(for: assets[0] as! PHAsset, targetSize: targetSizeImagePreview, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, info) in
+                self.imagePreview = image
+            })
+        }
+        
+        // Theming view
+        NotificationCenter.default.addObserver(self, selector: #selector(self.changeTheming), name: NSNotification.Name(rawValue: "changeTheming"), object: nil)
+        changeTheming()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool)
+    {
+        super.viewWillDisappear(animated)
+        
+        self.delegate?.dismissFormUploadAssets()
+    }
+    
+    @objc func changeTheming() {
+        appDelegate.changeTheming(self, tableView: tableView, collectionView: nil, form: true)
+        initializeForm()
+        self.reloadForm()
+    }
+    
+    //MARK: XLForm
     
     func initializeForm() {
         
@@ -68,6 +107,25 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         var section : XLFormSectionDescriptor
         var row : XLFormRowDescriptor
         
+        // Section Photo Editor only for one photo
+        
+        if assets.count == 1 && (assets[0] as! PHAsset).mediaType == PHAssetMediaType.image && self.imagePreview != nil {
+            
+            section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_modify_photo_", comment: ""))
+            form.addFormSection(section)
+            
+            row = XLFormRowDescriptor(tag: "ButtonPhotoEditor", rowType: XLFormRowDescriptorTypeButton, title: NSLocalizedString("_modify_photo_", comment: ""))
+            row.action.formSelector = #selector(photoEditor(_:))
+            row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+            
+            row.cellConfig["imageView.image"] = self.imagePreview
+            row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
+            row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.right.rawValue
+            row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+            
+            section.addFormRow(row)
+        }
+        
         // Section: Destination Folder
         
         section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_save_path_", comment: ""))
@@ -75,20 +133,22 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         
         row = XLFormRowDescriptor(tag: "ButtonDestinationFolder", rowType: XLFormRowDescriptorTypeButton, title: self.titleServerUrl)
         row.action.formSelector = #selector(changeDestinationFolder(_:))
-        
-        let imageFolder = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, multiplier:1, color: NCBrandColor.sharedInstance.brandElement) as UIImage
-        row.cellConfig["imageView.image"] = imageFolder
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
+        row.cellConfig["imageView.image"] = CCGraphics.changeThemingColorImage(UIImage(named: "folder")!, width: 50, height: 50, color: NCBrandColor.sharedInstance.brandElement) as UIImage
         row.cellConfig["textLabel.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
         
         // User folder Autoupload
         row = XLFormRowDescriptor(tag: "useFolderAutoUpload", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_use_folder_auto_upload_", comment: ""))
         row.value = 0
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
         
@@ -103,9 +163,10 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         row.hidden = "$\("useFolderAutoUpload") == 0"
         
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
-        
+
         // Section Mode filename
         
         section = XLFormSectionDescriptor.formSection(withTitle: NSLocalizedString("_mode_filename_", comment: ""))
@@ -115,8 +176,10 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         
         row = XLFormRowDescriptor(tag: "maintainOriginalFileName", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_maintain_original_filename_", comment: ""))
         row.value = CCUtility.getOriginalFileName(k_keyFileNameOriginal)
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
         
@@ -125,8 +188,10 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         row = XLFormRowDescriptor(tag: "addFileNameType", rowType: XLFormRowDescriptorTypeBooleanSwitch, title: NSLocalizedString("_add_filenametype_", comment: ""))
         row.value = CCUtility.getFileNameType(k_keyFileNameType)
         row.hidden = "$\("maintainOriginalFileName") == 1"
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         section.addFormRow(row)
         
@@ -141,12 +206,15 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
             row.value = fileNameMask
         }
         row.hidden = "$\("maintainOriginalFileName") == 1"
-        
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
         row.cellConfig["textLabel.font"] = UIFont.systemFont(ofSize: 15.0)
+        row.cellConfig["textLabel.textColor"] = NCBrandColor.sharedInstance.textView
         
         row.cellConfig["textField.textAlignment"] = NSTextAlignment.right.rawValue
         row.cellConfig["textField.font"] = UIFont.systemFont(ofSize: 15.0)
-        
+        row.cellConfig["textField.textColor"] = NCBrandColor.sharedInstance.textView
+
         section.addFormRow(row)
         
         // Section: Preview File Name
@@ -154,10 +222,12 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         row = XLFormRowDescriptor(tag: "previewFileName", rowType: XLFormRowDescriptorTypeTextView, title: "")
         row.height = 180
         row.disabled = true
-        
-        row.cellConfig["textView.backgroundColor"] = NCBrandColor.sharedInstance.backgroundView
+        row.cellConfig["backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
+
+        row.cellConfig["textView.backgroundColor"] = NCBrandColor.sharedInstance.backgroundForm
         row.cellConfig["textView.font"] = UIFont.systemFont(ofSize: 14.0)
-        
+        row.cellConfig["textView.textColor"] = NCBrandColor.sharedInstance.textView
+
         section.addFormRow(row)
         
         self.form = form
@@ -218,41 +288,12 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
                     
                     self.reloadFormRow(formRow)
                     
-                    appDelegate.messageNotification("_info_", description: "_forbidden_characters_", visible: true, delay: TimeInterval(k_dismissAfterSecond), type: TWMessageBarMessageType.info, errorCode: 0)
+                    NCContentPresenter.shared.messageNotification("_info_", description: "_forbidden_characters_", delay: TimeInterval(k_dismissAfterSecond), type: NCContentPresenter.messageType.info, errorCode: 0)
                 }
             }
             
             self.reloadFormRow(previewFileName)
         }
-    }
-    
-    // MARK: - View Life Cycle
-    
-    override func viewDidLoad() {
-        
-        super.viewDidLoad()
-        
-        let cancelButton : UIBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_cancel_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(cancel))
-        let saveButton : UIBarButtonItem = UIBarButtonItem(title: NSLocalizedString("_save_", comment: ""), style: UIBarButtonItem.Style.plain, target: self, action: #selector(save))
-        
-        self.navigationItem.leftBarButtonItem = cancelButton
-        self.navigationItem.rightBarButtonItem = saveButton
-        
-        self.navigationController?.navigationBar.isTranslucent = false
-        self.navigationController?.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand
-        self.navigationController?.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText
-        self.navigationController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: NCBrandColor.sharedInstance.brandText]
-        
-        self.tableView.separatorStyle = UITableViewCell.SeparatorStyle.none
-        
-        self.reloadForm()
-    }
-    
-    override func viewWillDisappear(_ animated: Bool)
-    {
-        super.viewWillDisappear(animated)
-        
-        self.delegate?.dismissFormUploadAssets()
     }
     
     func reloadForm() {
@@ -369,8 +410,57 @@ class NCCreateFormUploadAssets: XLFormViewController, NCSelectDelegate {
         viewController.titleButtonDone = NSLocalizedString("_select_", comment: "")
         viewController.type = ""
         
-        navigationController.modalPresentationStyle = UIModalPresentationStyle.formSheet
+        navigationController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
         self.present(navigationController, animated: true, completion: nil)
     }
     
+    @objc func photoEditor(_ sender: XLFormRowDescriptor) {
+        
+        self.deselectFormRow(sender)
+        
+        PHImageManager.default().requestImage(for: assets[0] as! PHAsset, targetSize: PHImageManagerMaximumSize, contentMode: PHImageContentMode.default, options: requestOptions, resultHandler: { (image, info) in
+            
+            let photoEditor = PhotoEditorViewController(nibName:"PhotoEditorViewController",bundle: Bundle(for: PhotoEditorViewController.self))
+
+            photoEditor.image = image
+            photoEditor.photoEditorDelegate = self
+            photoEditor.hiddenControls = [.save, .share, .sticker]
+            
+            photoEditor.cancelButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorCancel")!, multiplier:2, color: .white)
+            photoEditor.cropButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorCrop")!, multiplier:2, color: .white)
+            photoEditor.drawButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorDraw")!, multiplier:2, color: .white)
+            photoEditor.textButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorText")!, multiplier:2, color: .white)
+            photoEditor.clearButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorClear")!, multiplier:2, color: .white)
+            photoEditor.continueButtonImage = CCGraphics.changeThemingColorImage(UIImage(named: "photoEditorDone")!, multiplier:2, color: .white)
+            
+            self.present(photoEditor, animated: true, completion: nil)
+        })
+    }
+    
+    // MARK: - Photo Editor Delegate
+
+    func doneEditing(image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(imageSaved(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+    
+    @objc func imageSaved(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let fetchResult = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
+        if let asset = fetchResult.firstObject {
+            self.assets = NSMutableArray(array: [asset])
+        }
+        
+        // Preview
+        PHImageManager.default().requestImage(for: assets[0] as! PHAsset, targetSize: targetSizeImagePreview, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, info) in
+            let row : XLFormRowDescriptor  = self.form.formRow(withTag: "ButtonPhotoEditor")!
+            row.cellConfig["imageView.image"] = image
+            self.updateFormRow(row)
+        })
+    }
+    
+    func canceledEditing() {
+        print("Canceled")
+    }
 }

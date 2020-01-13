@@ -196,7 +196,40 @@
         }
         
     } else if ([elementName isEqualToString:@"hide_download"]) {
+        
         _currentShared.hideDownload = [_xmlChars boolValue];
+        
+    } else if ([elementName isEqualToString:@"note"]) {
+        
+        _currentShared.note = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"label"]) {
+        
+        _currentShared.label = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"displayname_file_owner"]) {
+        
+        _currentShared.displayNameFileOwner = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"url"]) {
+        
+        _currentShared.url = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"mimetype"]) {
+        
+        _currentShared.mimeType = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"storage_id"]) {
+        
+        _currentShared.storageID = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"file_parent"]) {
+        
+        _currentShared.fileParent = _xmlChars;
+        
+    } else if ([elementName isEqualToString:@"file_target"]) {
+        
+        _currentShared.fileTarget = _xmlChars;
     }
 }
 
@@ -205,14 +238,10 @@
 }
 
 - (void)parserDidEndDocument:(NSXMLParser *)parser{
-    
-    //NSLog(@"Finish xml directory list parse");
-    
+    NSLog(@"Finish xml shared parse");
     if (_currentShared) {
-        
         [_shareList addObject:_currentShared];
     }
 }
-
 
 @end

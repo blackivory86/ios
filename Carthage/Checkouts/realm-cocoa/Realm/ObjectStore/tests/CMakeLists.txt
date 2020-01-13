@@ -3,8 +3,8 @@ include_directories(../external/catch/single_include .)
 set(HEADERS
     util/event_loop.hpp
     util/index_helpers.hpp
-    util/templated_test_case.hpp
     util/test_file.hpp
+    util/test_utils.hpp
 )
 
 set(SOURCES
@@ -25,6 +25,7 @@ set(SOURCES
 
     util/event_loop.cpp
     util/test_file.cpp
+    util/test_utils.cpp
 )
 
 
@@ -66,3 +67,4 @@ create_coverage_target(generate-coverage tests)
 add_custom_target(run-tests USES_TERMINAL DEPENDS tests COMMAND ./tests)
 
 add_subdirectory(notifications-fuzzer)
+add_subdirectory(benchmarks)

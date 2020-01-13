@@ -25,13 +25,7 @@
 
 #import "NCPushNotificationEncryption.h"
 
-#import <openssl/rsa.h>
-#import <openssl/pem.h>
-#import <openssl/bio.h>
-#import <openssl/bn.h>
-#import <openssl/sha.h>
-#import <openssl/err.h>
-#import <openssl/ssl.h>
+#import <OpenSSL/OpenSSL.h>
 #import <CommonCrypto/CommonDigest.h>
 
 #import "NCEndToEndEncryption.h"
@@ -54,25 +48,24 @@
     self = [super init];
     if (self) {
        
-        self.ncPNPublicKey = [CCUtility getPushNotificationPublicKey];
-        self.ncPNPrivateKey = [CCUtility getPushNotificationPrivateKey];
     }
     return self;
 }
 
-- (BOOL)generatePushNotificationsKeyPair
+- (BOOL)generatePushNotificationsKeyPair:(NSString *)account
 {
-    EVP_PKEY *pkey;
-    NSError *keyError;
-    pkey = [[NCEndToEndEncryption sharedManager] generateRSAKey:&keyError];
-    if (keyError) {
-        return NO;
-    }
-    
-    // Extract publicKey, privateKey
     int len;
     char *keyBytes;
     
+    EVP_PKEY *pkey = EVP_PKEY_new();
+    BIGNUM *bigNumber = BN_new();
+    int exponent = RSA_F4;
+    RSA *rsa = RSA_new();
+    
+    BN_set_word(bigNumber, exponent);
+    RSA_generate_key_ex(rsa, 2048, bigNumber, NULL);
+    EVP_PKEY_set1_RSA(pkey, rsa);
+
     // PublicKey
     BIO *publicKeyBIO = BIO_new(BIO_s_mem());
     PEM_write_bio_PUBKEY(publicKeyBIO, pkey);
@@ -81,9 +74,9 @@
     keyBytes  = malloc(len);
     
     BIO_read(publicKeyBIO, keyBytes, len);
-    _ncPNPublicKey = [NSData dataWithBytes:keyBytes length:len];
-    [CCUtility setPushNotificationPublicKey:_ncPNPublicKey];
-    NSLog(@"Push Notifications Key Pair generated: \n%@", [[NSString alloc] initWithData:_ncPNPublicKey encoding:NSUTF8StringEncoding]);
+    NSData *ncPNPublicKey = [NSData dataWithBytes:keyBytes length:len];
+    [CCUtility setPushNotificationPublicKey:account data:ncPNPublicKey];
+    NSLog(@"Push Notifications Key Pair generated: \n%@", [[NSString alloc] initWithData:ncPNPublicKey encoding:NSUTF8StringEncoding]);
     
     // PrivateKey
     BIO *privateKeyBIO = BIO_new(BIO_s_mem());
@@ -93,9 +86,11 @@
     keyBytes = malloc(len);
     
     BIO_read(privateKeyBIO, keyBytes, len);
-    _ncPNPrivateKey = [NSData dataWithBytes:keyBytes length:len];
-    [CCUtility setPushNotificationPrivateKey:_ncPNPrivateKey];
+    NSData *ncPNPrivateKey = [NSData dataWithBytes:keyBytes length:len];
+    [CCUtility setPushNotificationPrivateKey:account data:ncPNPrivateKey];
     
+    RSA_free(rsa);
+    BN_free(bigNumber);
     EVP_PKEY_free(pkey);
     
     return YES;
@@ -136,6 +131,5 @@
     
     return decryptString;
 }
-
 
 @end

@@ -134,7 +134,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 - (void)viewDidLoad {
     
 	// View
-	self.view.backgroundColor = [UIColor whiteColor];
+    self.view.backgroundColor = NCBrandColor.sharedInstance.backgroundView;
     self.view.clipsToBounds = YES;
 
 	// Setup paging scrolling view
@@ -145,14 +145,14 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
 	_pagingScrollView.delegate = self;
 	_pagingScrollView.showsHorizontalScrollIndicator = NO;
 	_pagingScrollView.showsVerticalScrollIndicator = NO;
-	_pagingScrollView.backgroundColor = [UIColor whiteColor];
+    _pagingScrollView.backgroundColor = NCBrandColor.sharedInstance.backgroundView;
     _pagingScrollView.contentSize = [self contentSizeForPagingScrollView];
 	[self.view addSubview:_pagingScrollView];
 	
     // Toolbar
     _toolbar = [[UIToolbar alloc] initWithFrame:[self frameForToolbarAtOrientation:[[UIApplication sharedApplication] statusBarOrientation]]];
-    _toolbar.tintColor = [NCBrandColor sharedInstance].brandElement;
-    _toolbar.barTintColor = [NCBrandColor sharedInstance].tabBar;
+    _toolbar.tintColor = NCBrandColor.sharedInstance.brandElement;
+    _toolbar.barTintColor = NCBrandColor.sharedInstance.tabBar;
     [_toolbar setBackgroundImage:nil forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsDefault];
     [_toolbar setBackgroundImage:nil forToolbarPosition:UIToolbarPositionAny barMetrics:UIBarMetricsCompact];
     _toolbar.barStyle = UIBarStyleDefault; //TWS
@@ -170,7 +170,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     
     //TWS
     if (self.displayDeleteButton) {
-        _deleteButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"delete"] style:UIBarButtonItemStylePlain target:self action:@selector(deleteButtonPressed:)];
+        _deleteButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"deletePhotoBrowser"] style:UIBarButtonItemStylePlain target:self action:@selector(deleteButtonPressed:)];
     }
     
     if (self.displayActionButton) {
@@ -178,7 +178,7 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     }
     
     if (self.displayShareButton) {
-        _shareButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"share"] style:UIBarButtonItemStylePlain target:self action:@selector(shareButtonPressed:)];
+        _shareButton = [[UIBarButtonItem alloc] initWithImage:[UIImage imageNamed:@"sharePhotoBrowser"] style:UIBarButtonItemStylePlain target:self action:@selector(shareButtonPressed:)];
     }
     
     // Update
@@ -220,9 +220,9 @@ static void * MWVideoPlayerObservation = &MWVideoPlayerObservation;
     }
     
     // color
-    self.navigationController.navigationBar.barTintColor = [NCBrandColor sharedInstance].brand;
-    self.navigationController.navigationBar.tintColor = [NCBrandColor sharedInstance].brandText;
-    [self.navigationController.navigationBar setTitleTextAttributes:@{NSForegroundColorAttributeName : [NCBrandColor sharedInstance].brandText}];
+    self.navigationController.navigationBar.barTintColor = NCBrandColor.sharedInstance.brand;
+    self.navigationController.navigationBar.tintColor = NCBrandColor.sharedInstance.brandText;
+    [self.navigationController.navigationBar setTitleTextAttributes:@{NSForegroundColorAttributeName : NCBrandColor.sharedInstance.brandText}];
     self.navigationController.navigationBar.translucent = false;
     [self setExtendedLayoutIncludesOpaqueBars:YES];
     

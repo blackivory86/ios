@@ -6,6 +6,60 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [2.25.1] - 2019-12-08
+- See https://github.com/nextcloud/ios/milestone/59
+
+## [2.25.0] - 2019-11-20
+- See https://github.com/nextcloud/ios/milestone/58
+
+## [2.24.4] - 2019-11-03
+- See https://github.com/nextcloud/ios/milestone/57
+
+## [2.24.3] - 2019-10-15
+- See https://github.com/nextcloud/ios/milestone/56
+
+## [2.24.2] - 2019-10-09
+- See https://github.com/nextcloud/ios/milestone/55
+
+## [2.24.1] - 2019-09-20
+- See https://github.com/nextcloud/ios/milestone/54
+
+## [2.24.0] - 2019-09-19
+- See https://github.com/nextcloud/ios/milestone/52
+
+## [2.23.8] - 2019-08-17
+- See https://github.com/nextcloud/ios/milestone/53
+
+## [2.23.7] - 2019-06-11
+- See https://github.com/nextcloud/ios/milestone/51
+
+## [2.23.6] - 2019-05-22
+- See https://github.com/nextcloud/ios/milestone/50
+
+## [2.23.5] - 2019-04-30
+- See https://github.com/nextcloud/ios/milestone/49
+
+## [2.23.4] - 2019-04-28
+- See https://github.com/nextcloud/ios/milestone/48
+
+## [2.23.3] - 2019-04-3
+- See https://github.com/nextcloud/ios/milestone/47
+
+## [2.23.2] - 2019-03-19
+- See https://github.com/nextcloud/ios/milestone/46
+
+## [2.23.1] - 2019-03-1
+- See https://github.com/nextcloud/ios/milestone/46
+
+## [2.23.0] - 2019-02-18
+- See https://github.com/nextcloud/ios/milestone/45
+
+## [2.22.9] - 2019-02-14
+- See https://github.com/nextcloud/ios/milestone/44
+
+## [2.22.8] - 2019-01-17
+- See https://github.com/nextcloud/ios/milestone/43
+
 ## [2.22.7] - 2018-12-17
 - See https://github.com/nextcloud/ios/milestone/42
 

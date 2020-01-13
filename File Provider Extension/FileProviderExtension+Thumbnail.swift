@@ -22,6 +22,7 @@
 //
 
 import FileProvider
+import NCCommunication
 
 extension FileProviderExtension {
 
@@ -30,67 +31,43 @@ extension FileProviderExtension {
         let progress = Progress(totalUnitCount: Int64(itemIdentifiers.count))
         var counterProgress: Int64 = 0
         
-        // Check account
-        if providerData.setupActiveAccount() == false {
-            completionHandler(NSFileProviderError(.notAuthenticated))
-            return Progress(totalUnitCount:0)
-        }
-        
         for itemIdentifier in itemIdentifiers {
             
-            let metadata = providerData.getTableMetadataFromItemIdentifier(itemIdentifier)
-            if metadata != nil {
+            guard let metadata = fileProviderUtility.sharedInstance.getTableMetadataFromItemIdentifier(itemIdentifier) else {
                 
-                if (metadata!.typeFile == k_metadataTypeFile_image || metadata!.typeFile == k_metadataTypeFile_video) {
+                counterProgress += 1
+                if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
+                continue
+            }
+            
+            if (metadata.hasPreview) {
+                
+                let width = NCUtility.sharedInstance.getScreenWidthForPreview()
+                let height = NCUtility.sharedInstance.getScreenHeightForPreview()
+                
+                let fileNamePath = CCUtility.returnFileNamePath(fromFileName: metadata.fileName, serverUrl: metadata.serverUrl, activeUrl: fileProviderData.sharedInstance.accountUrl)!
+                let fileNameLocalPath = CCUtility.getDirectoryProviderStorageIconOcId(metadata.ocId, fileNameView: metadata.fileNameView)!
+                let serverUrl = fileProviderData.sharedInstance.accountUrl
                     
-                    guard let serverUrl = NCManageDatabase.sharedInstance.getServerUrl(metadata!.directoryID) else {
-                        continue
+                NCCommunication.sharedInstance.downloadPreview(serverUrl: serverUrl, fileNamePath: fileNamePath, fileNameLocalPath: fileNameLocalPath ,width: width, height: height, account: fileProviderData.sharedInstance.account) { (account, data, errorCode, errorDescription) in
+                    if errorCode == 0 && data != nil {
+                        perThumbnailCompletionHandler(itemIdentifier, data, nil)
+                    } else {
+                        perThumbnailCompletionHandler(itemIdentifier, nil, NSFileProviderError(.serverUnreachable))
                     }
-                    
-                    
-                    let width = NCUtility.sharedInstance.getScreenWidthForPreview()
-                    let height = NCUtility.sharedInstance.getScreenHeightForPreview()
-                    
-                    let ocNetworking = OCnetworking.init(delegate: nil, metadataNet: nil, withUser: providerData.accountUser, withUserID: providerData.accountUserID, withPassword: providerData.accountPassword, withUrl: providerData.accountUrl)
-                    
-                    ocNetworking?.downloadPreview(with: metadata!, serverUrl: serverUrl, withWidth: width, andHeight: height, completion: { (message, errorCode) in
-                        
-                        if errorCode == 0 {
-                            do {
-                                let url = URL.init(fileURLWithPath: CCUtility.getDirectoryProviderStorageIconFileID(metadata!.fileID, fileNameView: metadata!.fileNameView))
-                                let data = try Data.init(contentsOf: url)
-                                perThumbnailCompletionHandler(itemIdentifier, data, nil)
-                            } catch let error {
-                                print("error: \(error)")
-                                perThumbnailCompletionHandler(itemIdentifier, nil, NSFileProviderError(.noSuchItem))
-                            }
-                        } else {
-                            perThumbnailCompletionHandler(itemIdentifier, nil, NSFileProviderError(.serverUnreachable))
-                        }
-                        
-                        counterProgress += 1
-                        if (counterProgress == progress.totalUnitCount) {
-                            completionHandler(nil)
-                        }
-                    })
-                    
-                } else {
                     
                     counterProgress += 1
-                    if (counterProgress == progress.totalUnitCount) {
-                        completionHandler(nil)
-                    }
+                    if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
                 }
+               
             } else {
                 
                 counterProgress += 1
-                if (counterProgress == progress.totalUnitCount) {
-                    completionHandler(nil)
-                }
+                if (counterProgress == progress.totalUnitCount) { completionHandler(nil) }
             }
         }
         
         return progress
     }
-
+    
 }

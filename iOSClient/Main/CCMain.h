@@ -1,6 +1,6 @@
 //
 //  CCMain.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 04/09/14.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -27,7 +27,6 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <DZNEmptyDataSet/UIScrollView+EmptyDataSet.h>
 
-#import "TWMessageBarManager.h"
 #import "AHKActionSheet.h"
 #import "BKPasscodeViewController.h"
 #import "NSString+TruncateToWidth.h"
@@ -35,8 +34,6 @@
 #import "CCCellMain.h"
 #import "CCCellMainTransfer.h"
 #import "CCDetail.h"
-#import "CCShareOC.h"
-#import "CCShareInfoCMOC.h"
 #import "CCGraphics.h"
 #import "CCSection.h"
 #import "CCUtility.h"
@@ -46,24 +43,31 @@
 #import <MGSwipeTableCell/MGSwipeTableCell.h>
 
 @class tableMetadata;
+@class NCViewRichWorkspace;
 
-@interface CCMain : UIViewController <UITableViewDataSource, UITableViewDelegate, UIActionSheetDelegate, UIGestureRecognizerDelegate, UIDocumentInteractionControllerDelegate, UIViewControllerPreviewingDelegate, BKPasscodeViewControllerDelegate, UISplitViewControllerDelegate, UIPopoverControllerDelegate, CCShareOCDelegate, CCPeekPopDelegate, UIDocumentMenuDelegate, UIDocumentPickerDelegate, UISearchResultsUpdating, UISearchControllerDelegate, UISearchBarDelegate, UIScrollViewDelegate, DZNEmptyDataSetSource, DZNEmptyDataSetDelegate>
+@interface CCMain : UIViewController <UITableViewDataSource, UITableViewDelegate, UIActionSheetDelegate, UIGestureRecognizerDelegate, UIViewControllerPreviewingDelegate, BKPasscodeViewControllerDelegate, UISplitViewControllerDelegate, UIPopoverControllerDelegate, UIDocumentMenuDelegate, UIDocumentPickerDelegate, UISearchResultsUpdating, UISearchControllerDelegate, UISearchBarDelegate, UIScrollViewDelegate, DZNEmptyDataSetSource, DZNEmptyDataSetDelegate>
 
 @property (nonatomic, weak) IBOutlet UITableView *tableView;
+@property (nonatomic, strong) NCViewRichWorkspace *viewRichWorkspace;
+
 @property (nonatomic, strong) tableMetadata *metadata;
 @property (nonatomic, strong) tableMetadata *metadataForPushDetail;
+@property (nonatomic, strong) NSString *selectorForPushDetail;
+
 @property (nonatomic, strong) NSString *serverUrl;
 @property (nonatomic, strong) NSString *titleMain;
-@property (nonatomic, weak) CCShareOC *shareOC;
 @property (nonatomic, weak) CCDetail *detailViewController;
 @property (nonatomic, strong) UISearchController *searchController;
 @property (nonatomic, strong) UIView *reMenuBackgroundView;
 @property (nonatomic, strong) UITapGestureRecognizer *singleFingerTap;
+@property (nonatomic, strong) NSString *blinkFileNamePath;
+@property (nonatomic, readonly, strong) UIImage *cellFavouriteImage;
+@property (nonatomic, readonly, strong) UIImage *cellTrashImage;
+
 @property BOOL isSelectedMode;
 
-- (void)openIn:(tableMetadata *)metadata;
-
-- (void)shouldPerformSegue:(tableMetadata *)metadata;
+- (void)shouldPerformSegue:(tableMetadata *)metadata selector:(NSString *)selector;
+- (void)performSegueDirectoryWithControlPasscode:(BOOL)controlPasscode metadata:(tableMetadata *)metadata blinkFileNamePath:(NSString *)blinkFileNamePath;
 
 - (void)saveToPhotoAlbum:(tableMetadata *)metadata;
 
@@ -78,15 +82,16 @@
 
 - (void)uploadFileAsset:(NSMutableArray *)assets serverUrl:(NSString *)serverUrl useSubFolder:(BOOL)useSubFolder session:(NSString *)session;
 
-- (void)reloadDatasource:(NSString *)serverUrl fileID:(NSString *)fileID action:(NSInteger)action;
+- (void)reloadDatasource:(NSString *)serverUrl ocId:(NSString *)ocId action:(NSInteger)action;
 
-- (void)openWindowShare:(tableMetadata *)metadata;
 - (void)clearDateReadDataSource:(NSNotification *)notification;
 - (void)cancelSearchBar;
 
 - (void)openAssetsPickerController;
 - (void)openImportDocumentPicker;
 - (void)createFolder;
+
+- (void)setTableViewHeader;
 
 @end
 

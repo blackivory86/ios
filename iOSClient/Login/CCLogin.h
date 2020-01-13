@@ -1,6 +1,6 @@
 //
 //  CCLogin.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 09/04/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -24,20 +24,12 @@
 #import <UIKit/UIKit.h>
 
 #import "UIImage+animatedGIF.h"
-#import "CCCertificate.h"
 #import "OCNetworking.h"
 
-@class CCLoginWeb;
+@class NCLoginWeb;
+@class NCLoginQRCode;
 
-@protocol CCLoginDelegate <NSObject>
-
-- (void) loginSuccess:(NSInteger)loginType;
-
-@end
-
-@interface CCLogin : UIViewController <UITextFieldDelegate, NSURLSessionTaskDelegate, NSURLSessionDelegate, CCCertificateDelegate, OCNetworkingDelegate>
-
-@property (nonatomic, weak) id <CCLoginDelegate> delegate;
+@interface CCLogin : UIViewController <UITextFieldDelegate>
 
 @property (nonatomic, weak) IBOutlet UIImageView *imageBrand;
 
@@ -56,6 +48,6 @@
 @property (nonatomic, weak) IBOutlet UIButton *toggleVisiblePassword;
 @property (nonatomic, weak) IBOutlet UIButton *loginTypeView;
 
-@property NSInteger loginType;
+@property (nonatomic, weak) IBOutlet UIButton *qrCode;
 
 @end

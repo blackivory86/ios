@@ -1,6 +1,6 @@
  //
 //  CCSplit.m
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 09/10/15.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -27,7 +27,7 @@
 #import "NCAutoUpload.h"
 #import "NCBridgeSwift.h"
 
-@interface CCSplit () <CCLoginDelegate, CCLoginDelegateWeb>
+@interface CCSplit ()
 {
     AppDelegate *appDelegate;
     BOOL prevRunningInFullScreen;
@@ -43,8 +43,6 @@
 -  (id)initWithCoder:(NSCoder *)aDecoder
 {
     if (self = [super initWithCoder:aDecoder])  {
-        
-        appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
         prevRunningInFullScreen = YES;
     }
     
@@ -55,6 +53,9 @@
 {
     [super viewDidLoad];
 
+    appDelegate = (AppDelegate *)[[UIApplication sharedApplication] delegate];
+    self.delegate = self;
+    
     // Display mode SPLIT
     self.preferredDisplayMode = UISplitViewControllerDisplayModeAllVisible;
     //self.maximumPrimaryColumnWidth = 400;
@@ -63,19 +64,7 @@
     UITabBarController *tabBarController = [self.viewControllers firstObject];
     [appDelegate createTabBarController:tabBarController];
     
-    // Settings Navigation Controller
-    UINavigationController *navigationController = [self.viewControllers lastObject];
-    [appDelegate aspectNavigationControllerBar:navigationController.navigationBar online:YES hidden:NO];
-    
     [self inizialize];    
-}
-
-// Apparirà
-- (void)viewWillAppear:(BOOL)animated
-{
-    [super viewWillAppear:animated];
-    
-    [self showIntro];
 }
 
 - (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator
@@ -123,68 +112,6 @@
 }
 
 #pragma --------------------------------------------------------------------------------------------
-#pragma mark ===== Intro =====
-#pragma --------------------------------------------------------------------------------------------
-
-- (void)showIntro
-{
-    // Brand
-    if ([NCBrandOptions sharedInstance].disable_intro) {
-        
-        [CCUtility setIntro:YES];
-        if (appDelegate.activeAccount.length == 0) {
-            [appDelegate openLoginView:self loginType:k_login_Add selector:k_intro_login];
-        }
-    
-    } else {
-    
-        if ([CCUtility getIntro] == NO) {
-        
-            _intro = [[CCIntro alloc] initWithDelegate:self delegateView:self.view];
-            [_intro show];
-        
-        } else {
-            if (appDelegate.activeAccount.length == 0) {
-                [appDelegate openLoginView:self loginType:k_login_Add selector:k_intro_login];
-            }
-        }
-    }
-}
-
-- (void)introFinishSelector:(NSInteger)selector
-{
-    switch (selector) {
-            
-        case k_intro_login:
-            {
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^(void) {
-                    if (appDelegate.activeAccount.length == 0) {
-                        [appDelegate openLoginView:self loginType:k_login_Add selector:k_intro_login];
-                    }
-                });
-            }
-            break;
-            
-        case k_intro_signup:
-            {
-                [appDelegate openLoginView:self loginType:k_login_Add selector:k_intro_signup];
-            }
-            break;
-    }
-}
-
-#pragma --------------------------------------------------------------------------------------------
-#pragma mark === Delegate Login ===
-#pragma --------------------------------------------------------------------------------------------
-
-- (void)loginSuccess:(NSInteger)loginType
-{
-    [[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:@"initializeMain" object:nil userInfo:nil];
-    
-    [appDelegate subscribingNextcloudServerPushNotification];
-}
-
-#pragma --------------------------------------------------------------------------------------------
 #pragma mark ===== Split View Controller =====
 #pragma --------------------------------------------------------------------------------------------
 
@@ -205,9 +132,6 @@
     
     // No detail view present
     UINavigationController *secondaryNC = [[UIStoryboard storyboardWithName:@"Main" bundle:nil] instantiateViewControllerWithIdentifier:@"CCDetailNC"];
-    
-    // Color
-    [appDelegate aspectNavigationControllerBar:secondaryNC.navigationBar online:YES hidden:NO];
     
     // Ensure back button is enabled
     UIViewController *detailViewController = [secondaryNC visibleViewController];
@@ -290,6 +214,18 @@
 {
     // simply create a property of 'BOOL' type
     BOOL isRunningInFullScreen = CGRectEqualToRect([UIApplication sharedApplication].delegate.window.frame, [UIApplication sharedApplication].delegate.window.screen.bounds);
+    
+    // detect Dark Mode
+    if (@available(iOS 13.0, *)) {
+        if ([CCUtility getDarkModeDetect]) {
+            if (self.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark) {
+                [CCUtility setDarkMode:YES];
+            } else {
+                [CCUtility setDarkMode:NO];
+            }
+        }
+        [[NSNotificationCenter defaultCenter] postNotificationOnMainThreadName:@"changeTheming" object:nil];
+    }
     
     prevRunningInFullScreen = isRunningInFullScreen;
     

@@ -27,4 +27,29 @@
 
 @implementation OCSharedDto
 
+- (id)init {
+    
+    self = [super init];
+    
+    if (self) {
+        
+        self.shareWith = @"";
+        self.path = @"";
+        self.token = @"";
+        self.url = @"";
+        self.uidOwner = @"";
+        self.shareWithDisplayName = @"";
+        self.displayNameOwner = @"";
+        self.uidFileOwner = @"";
+        self.fileTarget = @"";
+        self.note = @"";
+        self.label = @"";
+        self.displayNameFileOwner = @"";
+        self.mimeType = @"";
+        self.storageID = @"";
+        self.fileParent = @"";
+    }
+    
+    return self;
+}
 @end

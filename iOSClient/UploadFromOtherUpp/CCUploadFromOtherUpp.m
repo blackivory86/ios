@@ -1,6 +1,6 @@
 //
 //  CCUploadFromOtherUpp.m
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 01/12/14.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -25,7 +25,7 @@
 #import "AppDelegate.h"
 #import "NCBridgeSwift.h"
 
-@interface CCUploadFromOtherUpp()
+@interface CCUploadFromOtherUpp() <NCSelectDelegate>
 {
     AppDelegate *appDelegate;
 
@@ -48,22 +48,16 @@
     serverUrlLocal= [CCUtility getHomeServerUrlActiveUrl:appDelegate.activeUrl];
     destinationTitle = NSLocalizedString(@"_home_", nil);
     
-    // Color
-    [appDelegate aspectNavigationControllerBar:self.navigationController.navigationBar online:[appDelegate.reachability isReachable] hidden:NO];
-    [appDelegate aspectTabBar:self.tabBarController.tabBar hidden:NO];
-}
-
-- (void)didReceiveMemoryWarning
-{
-    [super didReceiveMemoryWarning];
-}
-
-// E' apparsa
-- (void)viewDidAppear:(BOOL)animated
-{
-    [super viewDidAppear:animated];
+    // changeTheming
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(changeTheming) name:@"changeTheming" object:nil];
+    [self changeTheming];
     
     [self.tableView reloadData];
+}
+
+- (void)changeTheming
+{
+    [appDelegate changeTheming:self tableView:self.tableView collectionView:nil form:false];
 }
 
 #pragma --------------------------------------------------------------------------------------------
@@ -145,59 +139,58 @@
 #pragma mark == IBAction ==
 #pragma --------------------------------------------------------------------------------------------
 
-- (void)moveServerUrlTo:(NSString *)serverUrlTo title:(NSString *)title type:(NSString *)type
+- (void)dismissSelectWithServerUrl:(NSString *)serverUrl metadata:(tableMetadata *)metadata type:(NSString *)type
 {
-    if (serverUrlTo) {
-        serverUrlLocal = serverUrlTo;
-        if (title) destinationTitle = title;
-        else destinationTitle = NSLocalizedString(@"_home_", nil);
+    if (serverUrl) {
+        serverUrlLocal = serverUrl;
+        destinationTitle = metadata.fileNameView;
+        //destinationTitle = NSLocalizedString(@"_home_", nil);
     }
 }
 
 - (void)changeFolder
 {
-    UINavigationController *navigationController = [[UIStoryboard storyboardWithName:@"CCMove" bundle:nil] instantiateViewControllerWithIdentifier:@"CCMove"];
+    UINavigationController *navigationController = [[UIStoryboard storyboardWithName:@"NCSelect" bundle:nil] instantiateInitialViewController];
+    NCSelect *viewController = (NCSelect *)navigationController.topViewController;
     
-    CCMove *viewController = (CCMove *)navigationController.topViewController;
     viewController.delegate = self;
-    viewController.move.title = NSLocalizedString(@"_select_", nil);
-    viewController.tintColor = [NCBrandColor sharedInstance].brandText;
-    viewController.barTintColor = [NCBrandColor sharedInstance].brand;
-    viewController.tintColorTitle = [NCBrandColor sharedInstance].brandText;
-    viewController.networkingOperationQueue = appDelegate.netQueue;
-    // E2EE
-    viewController.includeDirectoryE2EEncryption = NO;
+    viewController.hideButtonCreateFolder = false;
+    viewController.selectFile = false;
+    viewController.includeDirectoryE2EEncryption = false;
+    viewController.includeImages = false;
+    viewController.type = @"";
+    viewController.titleButtonDone = NSLocalizedString(@"_select_", nil);
+    viewController.layoutViewSelect = k_layout_view_move;
     
+    [navigationController setModalPresentationStyle:UIModalPresentationFullScreen];
     [self presentViewController:navigationController animated:YES completion:nil];
 }
 
 -(void)upload
 {
-    NSString *directoryID = [[NCManageDatabase sharedInstance] getDirectoryID:serverUrlLocal];
-    NSString *fileName = [[NCUtility sharedInstance] createFileName:appDelegate.fileNameUpload directoryID:directoryID];
-    NSString *fileID = [directoryID stringByAppendingString:appDelegate.fileNameUpload];
+    NSString *fileName = [[NCUtility sharedInstance] createFileName:appDelegate.fileNameUpload serverUrl:serverUrlLocal account:appDelegate.activeAccount];
     
     tableMetadata *metadataForUpload = [tableMetadata new];
     
     metadataForUpload.account = appDelegate.activeAccount;
     metadataForUpload.date = [NSDate new];
-    metadataForUpload.directoryID = directoryID;
-    metadataForUpload.fileID = fileID;
+    metadataForUpload.ocId = [CCUtility createMetadataIDFromAccount:appDelegate.activeAccount serverUrl:serverUrlLocal fileNameView:fileName directory:false];
     metadataForUpload.fileName = fileName;
     metadataForUpload.fileNameView = fileName;
+    metadataForUpload.serverUrl = serverUrlLocal;
     metadataForUpload.session = k_upload_session;
     metadataForUpload.sessionSelector = selectorUploadFile;
     metadataForUpload.status = k_metadataStatusWaitUpload;
     
     // Prepare file and directory
-    [CCUtility copyFileAtPath:[NSTemporaryDirectory() stringByAppendingString:appDelegate.fileNameUpload] toPath:[CCUtility getDirectoryProviderStorageFileID:metadataForUpload.fileID fileNameView:fileName]];
+    [CCUtility copyFileAtPath:[NSTemporaryDirectory() stringByAppendingString:appDelegate.fileNameUpload] toPath:[CCUtility getDirectoryProviderStorageOcId:metadataForUpload.ocId fileNameView:fileName]];
     
     // Add Medtadata for upload
     (void)[[NCManageDatabase sharedInstance] addMetadata:metadataForUpload];
-    [appDelegate performSelectorOnMainThread:@selector(loadAutoDownloadUpload) withObject:nil waitUntilDone:YES];
-    
-    [[NCMainCommon sharedInstance] reloadDatasourceWithServerUrl:serverUrlLocal fileID:fileID action:k_action_NULL];
+    [[NCMainCommon sharedInstance] reloadDatasourceWithServerUrl:serverUrlLocal ocId:metadataForUpload.ocId action:k_action_NULL];
 
+    [appDelegate startLoadAutoDownloadUpload];
+    
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 

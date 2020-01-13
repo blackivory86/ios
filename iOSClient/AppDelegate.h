@@ -1,6 +1,6 @@
 //
 //  AppDelegate.h
-//  Nextcloud iOS
+//  Nextcloud
 //
 //  Created by Marino Faggiana on 04/09/14.
 //  Copyright (c) 2017 Marino Faggiana. All rights reserved.
@@ -23,29 +23,31 @@
 
 #import <Foundation/Foundation.h>
 #import <UserNotifications/UserNotifications.h>
+#import <PushKit/PushKit.h>
 
 #import "BKPasscodeLockScreenManager.h"
 #import "REMenu.h"
 #import "Reachability.h"
-#import "TWMessageBarManager.h"
 #import "CCBKPasscode.h"
 #import "CCUtility.h"
-#import "CCActivity.h"
 #import "CCDetail.h"
 #import "CCMain.h"
-#import "CCMedia.h"
 #import "CCSettings.h"
 #import "CCFavorites.h"
 #import "CCTransfers.h"
 
-@class CCLoginWeb;
 @class CCMore;
+@class NCMedia;
+@class NCOffline;
+@class NCAppConfigView;
+@class IMImagemeterViewer;
 
-@interface AppDelegate : UIResponder <UIApplicationDelegate, BKPasscodeLockScreenManagerDelegate, BKPasscodeViewControllerDelegate, TWMessageBarStyleSheet, CCNetworkingDelegate>
+@interface AppDelegate : UIResponder <UIApplicationDelegate, BKPasscodeLockScreenManagerDelegate, BKPasscodeViewControllerDelegate, CCNetworkingDelegate, PKPushRegistryDelegate>
 
 // Timer Process
 @property (nonatomic, strong) NSTimer *timerProcessAutoDownloadUpload;
 @property (nonatomic, strong) NSTimer *timerUpdateApplicationIconBadgeNumber;
+@property (nonatomic, strong) NSTimer *timerErrorNetworking;
 
 // For LMMediaPlayerView
 @property (strong, nonatomic) UIWindow *window;
@@ -65,16 +67,8 @@
 // Notification
 @property (nonatomic, strong) NSMutableArray<OCCommunication *> *listOfNotifications;
 
-// Network Operation
-@property (nonatomic, strong) NSOperationQueue *netQueue;
-
 // Networking 
 @property (nonatomic, copy) void (^backgroundSessionCompletionHandler)(void);
-
-// Network Share
-@property (nonatomic, strong) NSMutableDictionary *sharesID;
-@property (nonatomic, strong) NSMutableDictionary *sharesLink;
-@property (nonatomic, strong) NSMutableDictionary *sharesUserAndGroup;
 
 // UploadFromOtherUpp
 @property (nonatomic, strong) NSString *fileNameUpload;
@@ -85,6 +79,9 @@
 // Audio Video
 @property (nonatomic, strong) AVPlayer *player;
 @property (nonatomic, strong) AVPlayerViewController *playerController;
+
+// Push Norification Token
+@property (nonatomic, strong) NSString *pushKitToken;
 
 // Remenu
 @property (nonatomic, strong) REMenu *reMainMenu;
@@ -99,6 +96,7 @@
 @property (nonatomic, strong) REMenuItem *typefileItem;
 @property (nonatomic, strong) REMenuItem *dateItem;
 @property (nonatomic, strong) REMenuItem *directoryOnTopItem;
+@property (nonatomic, strong) REMenuItem *addFolderInfo;
 
 @property (nonatomic, strong) REMenu *reSelectMenu;
 @property (nonatomic, strong) REMenuItem *selectAllItem;
@@ -116,23 +114,27 @@
 @property (nonatomic, strong) CCMain *activeMain;
 @property (nonatomic, strong) CCMain *homeMain;
 @property (nonatomic, strong) CCFavorites *activeFavorites;
-@property (nonatomic, strong) CCMedia *activeMedia;
+@property (nonatomic, strong) NCMedia *activeMedia;
 @property (nonatomic, retain) CCDetail *activeDetail;
-@property (nonatomic, retain) CCSettings *activeSettings;
-@property (nonatomic, retain) CCActivity *activeActivity;
 @property (nonatomic, retain) CCTransfers *activeTransfers;
 @property (nonatomic, retain) CCLogin *activeLogin;
-@property (nonatomic, retain) CCLoginWeb *activeLoginWeb;
+@property (nonatomic, retain) NCLoginWeb *activeLoginWeb;
 @property (nonatomic, retain) CCMore *activeMore;
+@property (nonatomic, retain) NCOffline *activeOffline;
+@property (nonatomic, retain) NCAppConfigView *appConfigView;
+@property (nonatomic, retain) IMImagemeterViewer *activeImagemeterView;
 
 @property (nonatomic, strong) NSMutableDictionary *listMainVC;
 @property (nonatomic, strong) NSMutableDictionary *listProgressMetadata;
 
-@property (nonatomic, strong) NSMutableArray *filterFileID;
+@property (nonatomic, strong) NSMutableArray *filterocId;
 
-@property (nonatomic, strong) NSString *pnDeviceIdentifier;
-@property (nonatomic, strong) NSString *pnDeviceIdentifierSignature;
-@property (nonatomic, strong) NSString *pnPublicKey;
+@property (nonatomic, strong) NSMutableArray *sessionPendingStatusInUpload;
+
+@property (nonatomic) UIUserInterfaceStyle preferredUserInterfaceStyle API_AVAILABLE(ios(12.0));
+
+// Shares
+@property (nonatomic, strong) NSArray *shares;
 
 // Maintenance Mode
 @property BOOL maintenanceMode;
@@ -140,39 +142,38 @@
 // UserDefaults
 @property (nonatomic, strong) NSUserDefaults *ncUserDefaults;
 
-// Login View
-- (void)openLoginView:(id)delegate loginType:(NSInteger)loginType selector:(NSInteger)selector;
+// Login
+- (void)startTimerErrorNetworking;
+- (void)openLoginView:(UIViewController *)viewController selector:(NSInteger)selector openLoginWeb:(BOOL)openLoginWeb;
 
-// Setting Active Account
+// Setting Account
 - (void)settingActiveAccount:(NSString *)activeAccount activeUrl:(NSString *)activeUrl activeUser:(NSString *)activeUser activeUserID:(NSString *)activeUserID activePassword:(NSString *)activePassword;
+- (void)deleteAccount:(NSString *)account wipe:(BOOL)wipe;
 
 // Quick Actions - ShotcutItem
 - (void)configDynamicShortcutItems;
 - (BOOL)handleShortCutItem:(UIApplicationShortcutItem *)shortcutItem;
 
-// StatusBar & ApplicationIconBadgeNumber
-- (void)messageNotification:(NSString *)title description:(NSString *)description visible:(BOOL)visible delay:(NSTimeInterval)delay type:(TWMessageBarMessageType)type errorCode:(NSInteger)errorcode;
+// ApplicationIconBadgeNumber
 - (void)updateApplicationIconBadgeNumber;
 
 // TabBarController
 - (void)createTabBarController:(UITabBarController *)tabBarController;
-- (void)aspectNavigationControllerBar:(UINavigationBar *)nav online:(BOOL)online hidden:(BOOL)hidden;
-- (void)aspectTabBar:(UITabBar *)tab hidden:(BOOL)hidden;
 - (void)plusButtonVisibile:(BOOL)visible;
 - (void)selectedTabBarController:(NSInteger)index;
 - (NSString *)getTabBarControllerActiveServerUrl;
 
 // Push Notification
-- (void)subscribingNextcloudServerPushNotification;
-- (void)unsubscribingNextcloudServerPushNotification;
+- (void)pushNotification;
+- (void)unsubscribingNextcloudServerPushNotification:(NSString *)account url:(NSString *)url withSubscribing:(BOOL)subscribing;
 
 // Theming Color
 - (void)settingThemingColorBrand;
-- (void)changeTheming:(UIViewController *)vc;
+- (void)changeTheming:(UIViewController *)viewController tableView:(UITableView *)tableView collectionView:(UICollectionView *)collectionView form:(BOOL)form;
 
 // Task Networking
-- (void)addNetworkingOperationQueue:(NSOperationQueue *)netQueue delegate:(id)delegate metadataNet:(CCMetadataNet *)metadataNet;
 - (void)loadAutoDownloadUpload;
+- (void)startLoadAutoDownloadUpload;
 
 // Maintenance Mode
 - (void)maintenanceMode:(BOOL)mode;
